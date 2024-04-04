@@ -13,3 +13,5 @@ Imports:
     cli,
     purrr,
     rlang
+URL: https://github.com/EthanSansom/specifyr
+BugReports: https://github.com/EthanSansom/specifyr/issues
