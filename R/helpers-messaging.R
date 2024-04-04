@@ -37,7 +37,7 @@ at_locations <- function(at) {
 
 as_index <- function(..., .recycled = FALSE) {
   dots <- purrr::map_if(
-    list2(...),
+    rlang::list2(...),
     .p = is.character,
     .f = \(x) paste0("'", x, "'")
   )

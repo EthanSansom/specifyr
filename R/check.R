@@ -2,29 +2,30 @@
 
 new_check <- function(check) {
   stopifnot(rlang::is_function(check))
-  structure(check, class = "obj_check")
+  structure(check, class = "specifyr_obj_check")
 }
 
-check <- function(predicate, message) {
+check <- function(.pred, .msg, .msg_env = rlang::base_env()) {
 
-  stop_wrong_vec(message, cls = "character", nas = FALSE)
-  stopifnot(rlang::is_function(predicate))
+  # TODO Ethan: Improve `predicate` error message
+  stop_wrong_vec(.msg, cls = "character", nas = FALSE)
+  stopifnot(rlang::is_function(.pred))
 
   check_fn <- function(
     arg,
     arg_name = rlang::caller_arg(arg),
     error_call = rlang::caller_env(),
-    error_class = "objspec_error_mispecified"
+    error_class = "specifyr_error_object_mispecified"
   ) {
 
-    results <- predicate(arg)
+    results <- .pred(arg)
     if (!rlang::is_logical(results)) {
       cli::abort("`check` must return a logical vector.")
     }
 
     loc <- which(is.na(results) | !results)
-    cli_env <- env(
-      base_env(),
+    cli_env <- rlang::env(
+      .msg_env,
       arg = arg,
       arg_name = arg_name,
       loc = loc,
@@ -33,9 +34,9 @@ check <- function(predicate, message) {
 
     if (!isTRUE(all(results))) {
       cli::cli_abort(
-        message,
+        .msg,
         call = error_call,
-        class = c(error_class, "objspec_error"),
+        class = c(error_class, "specifyr_error"),
         .envir = cli_env
       )
     }
@@ -46,7 +47,7 @@ check <- function(predicate, message) {
 
 }
 
-is_check <- function(x) inherits(x, "obj_check")
+is_check <- function(x) inherits(x, "specifyr_obj_check")
 
 # internal ---------------------------------------------------------------------
 
@@ -55,16 +56,34 @@ check_cls <- function(
     cls,
     arg_name = rlang::caller_arg(arg),
     error_call = rlang::caller_env(),
-    error_class = "objspec_error_mispecified"
+    error_class = "specifyr_error_object_mispecified"
 ) {
 
   if (!inherits(arg, cls)) {
     arg_cls <- class(arg)
     cli::cli_abort(
       "{.arg {arg_name}} must be class {.cls {cls}}, not class {.cls {arg_cls}}.",
-      cls = cls, arg_cls = arg_cls,
+      cls = cls,
+      arg_cls = arg_cls,
       call = error_call,
-      class = c(error_class, "objspec_error")
+      class = c(error_class, "specifyr_error")
+    )
+  }
+
+}
+
+check_vctr <- function(
+    arg,
+    arg_name = rlang::caller_arg(arg),
+    error_call = rlang::caller_env(),
+    error_class = "specifyr_error_object_mispecified"
+  ) {
+
+  if (!vctrs::obj_is_vector(arg)) {
+    cli::cli_abort(
+      "{.arg {arg_name}} must be a vector, not {.obj_type_friendly {arg}}.",
+      call = error_call,
+      class = c(error_class, "specifyr_error")
     )
   }
 
@@ -75,7 +94,7 @@ check_len <- function(
     len,
     arg_name = rlang::caller_arg(arg),
     error_call = rlang::caller_env(),
-    error_class = "objspec_error_mispecified"
+    error_class = "specifyr_error_object_mispecified"
 ) {
 
   len_length <- length(len)
@@ -105,7 +124,7 @@ check_len_exact <- function(
     len,
     arg_name = rlang::caller_arg(arg),
     error_call = rlang::caller_env(),
-    error_class = "objspec_error_mispecified"
+    error_class = "specifyr_error_object_mispecified"
 ) {
 
   arg_len <- length(arg)
@@ -115,7 +134,7 @@ check_len_exact <- function(
       len = len,
       arg_len = arg_len,
       call = error_call,
-      class = c(error_class, "objspec_error")
+      class = c(error_class, "specifyr_error")
     )
   }
 
@@ -127,7 +146,7 @@ check_len_range <- function(
     max_len,
     arg_name = rlang::caller_arg(arg),
     error_call = rlang::caller_env(),
-    error_class = "objspec_error_mispecified"
+    error_class = "specifyr_error_object_mispecified"
 ) {
 
   arg_len <- length(arg)
@@ -139,7 +158,7 @@ check_len_range <- function(
       ),
       min_len = min_len, max_len = max_len, arg_len = arg_len,
       call = error_call,
-      class = c(error_class, "objspec_error")
+      class = c(error_class, "specifyr_error")
     )
   }
 
@@ -149,7 +168,7 @@ check_nas <- function(
     arg,
     arg_name = rlang::caller_arg(arg),
     error_call = rlang::caller_env(),
-    error_class = "objspec_error_mispecified"
+    error_class = "specifyr_error_object_mispecified"
 ) {
 
   arg_nas <- is.na(arg)
@@ -162,7 +181,7 @@ check_nas <- function(
       ),
       locations = locations,
       call = error_call,
-      class = c(error_class, "objspec_error")
+      class = c(error_class, "specifyr_error")
     )
   }
 
@@ -173,7 +192,7 @@ check_nm1 <- function(
     target_name,
     arg_name = rlang::caller_arg(arg),
     error_call = rlang::caller_env(),
-    error_class = "objspec_error_mispecified"
+    error_class = "specifyr_error_object_mispecified"
 ) {
 
   if (target_name == "") {
@@ -183,7 +202,7 @@ check_nm1 <- function(
     cli::cli_abort(
       "{.arg {arg_name}} must be unnamed, not named {.val {actual_name}}.",
       call = error_call,
-      class = c(error_class, "objspec_error")
+      class = c(error_class, "specifyr_error")
     )
   }
 
@@ -192,9 +211,29 @@ check_nm1 <- function(
     cli::cli_abort(
       paste("{.arg {arg_name}} must be named {.val {target_name}}, not", not),
       call = error_call,
-      class = c(error_class, "objspec_error")
+      class = c(error_class, "specifyr_error")
     )
   }
   TRUE
 
 }
+
+check_attatched <- function(
+    checks,
+    arg,
+    arg_name = rlang::caller_arg(arg),
+    error_call = rlang::caller_env(),
+    error_class = "specifyr_error_object_mispecified"
+) {
+
+  for (predicate in checks) {
+    predicate(
+      arg = arg,
+      arg_name = arg_name,
+      error_call = error_call,
+      error_class = error_class
+    )
+  }
+
+}
+
