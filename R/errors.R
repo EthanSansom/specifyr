@@ -4,9 +4,9 @@ stop_wrong_vec <- function(
     len = NULL,
     nas = TRUE,
     opt = FALSE,
-    arg_name = caller_arg(arg),
-    error_call = caller_env(),
-    error_class = "objspec_error_api"
+    arg_name = rlang::caller_arg(arg),
+    error_call = rlang::caller_env(),
+    error_class = "specifyr_error_api"
 ) {
 
   if (opt && is.null(arg)) {

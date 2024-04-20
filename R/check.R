@@ -5,11 +5,18 @@ new_check <- function(check) {
   structure(check, class = "specifyr_obj_check")
 }
 
+# TODO Ethan:
+# Add a `title` argument (by default rlang::caller_arg(.pred)) which can be used
+# when formatting the check.
 check <- function(.pred, .msg, .msg_env = rlang::base_env()) {
 
-  # TODO Ethan: Improve `predicate` error message
   stop_wrong_vec(.msg, cls = "character", nas = FALSE)
-  stopifnot(rlang::is_function(.pred))
+  if (!rlang::is_function(.pred)) {
+    cli::cli_abort(
+      "{.arg .pred} must be a function, not {.obj_type_friendly {(.pred)}.",
+      class = c("specifyr_error_api", "specifyr_error")
+    )
+  }
 
   check_fn <- function(
     arg,
@@ -18,9 +25,10 @@ check <- function(.pred, .msg, .msg_env = rlang::base_env()) {
     error_class = "specifyr_error_object_mispecified"
   ) {
 
+    # TODO Ethan: Improve this internal error
     results <- .pred(arg)
     if (!rlang::is_logical(results)) {
-      cli::abort("`check` must return a logical vector.")
+      cli::abort("Can't check {.arg {arg_name}}.")
     }
 
     loc <- which(is.na(results) | !results)
@@ -34,7 +42,7 @@ check <- function(.pred, .msg, .msg_env = rlang::base_env()) {
 
     if (!isTRUE(all(results))) {
       cli::cli_abort(
-        .msg,
+        c(.msg, error_spec_call_prompt(error_class)),
         call = error_call,
         class = c(error_class, "specifyr_error"),
         .envir = cli_env
@@ -61,8 +69,24 @@ check_cls <- function(
 
   if (!inherits(arg, cls)) {
     arg_cls <- class(arg)
+    cli::cli_div(
+      theme = list(
+        .multi_cls = list(
+          color = "blue",
+          before = "<",
+          after = ">",
+          `vec-trunc` = 5,
+          `vec-sep` = ", ",
+          `vec-sep2` = " or ",
+          `vec-last` = " or "
+        )
+      )
+    )
     cli::cli_abort(
-      "{.arg {arg_name}} must be class {.cls {cls}}, not class {.cls {arg_cls}}.",
+      c(
+        "{.arg {arg_name}} must be class {.multi_cls {cls}}, not class {.cls {arg_cls}}.",
+        error_spec_call_prompt(error_class)
+      ),
       cls = cls,
       arg_cls = arg_cls,
       call = error_call,
@@ -81,7 +105,10 @@ check_vctr <- function(
 
   if (!vctrs::obj_is_vector(arg)) {
     cli::cli_abort(
-      "{.arg {arg_name}} must be a vector, not {.obj_type_friendly {arg}}.",
+      c(
+        "{.arg {arg_name}} must be a vector, not {.obj_type_friendly {arg}}.",
+        error_spec_call_prompt(error_class)
+      ),
       call = error_call,
       class = c(error_class, "specifyr_error")
     )
@@ -130,7 +157,10 @@ check_len_exact <- function(
   arg_len <- length(arg)
   if (arg_len != len) {
     cli::cli_abort(
-      "{.arg {arg_name}} must be length {len}, not length {arg_len}.",
+      c(
+        "{.arg {arg_name}} must be length {len}, not length {arg_len}.",
+        error_spec_call_prompt(error_class)
+      ),
       len = len,
       arg_len = arg_len,
       call = error_call,
@@ -154,7 +184,8 @@ check_len_range <- function(
     cli::cli_abort(
       c(
         "{.arg {arg_name}} must have length in range [{min_len}, {max_len}].",
-        x = "{.arg {arg_name}} has length {arg_len}."
+        x = "{.arg {arg_name}} has length {arg_len}.",
+        error_spec_call_prompt(error_class)
       ),
       min_len = min_len, max_len = max_len, arg_len = arg_len,
       call = error_call,
@@ -177,7 +208,8 @@ check_nas <- function(
     cli::cli_abort(
       c(
         "{.arg {arg_name}} must contain no {.val {NA}} values.",
-        x = "{.arg {arg_name}} is {.val {NA}} {at_locations(locations)}."
+        x = "{.arg {arg_name}} is {.val {NA}} {at_locations(locations)}.",
+        error_spec_call_prompt(error_class)
       ),
       locations = locations,
       call = error_call,
@@ -200,7 +232,10 @@ check_nm1 <- function(
       return(TRUE)
     }
     cli::cli_abort(
-      "{.arg {arg_name}} must be unnamed, not named {.val {actual_name}}.",
+      c(
+        "{.arg {arg_name}} must be unnamed, not named {.val {actual_name}}.",
+        error_spec_call_prompt(error_class)
+      ),
       call = error_call,
       class = c(error_class, "specifyr_error")
     )
@@ -209,7 +244,10 @@ check_nm1 <- function(
   if (target_name != actual_name) {
     not <- if (actual_name == "") "be unamed." else "{.val {actual_name}}."
     cli::cli_abort(
-      paste("{.arg {arg_name}} must be named {.val {target_name}}, not", not),
+      c(
+        paste("{.arg {arg_name}} must be named {.val {target_name}}, not", not),
+        error_spec_call_prompt(error_class)
+      ),
       call = error_call,
       class = c(error_class, "specifyr_error")
     )
@@ -237,3 +275,17 @@ check_attatched <- function(
 
 }
 
+# helpers ----------------------------------------------------------------------
+
+# Output message contains a reference `{arg_name}` without knowing anything
+# about `arg_name`, which is a little suspect...
+error_spec_call_prompt <- function(error_class) {
+  correct_class <- isTRUE(error_class == "specifyr_error_object_mispecified")
+  interactive <- rlang::is_interactive()
+  if (correct_class && interactive) {
+    cli::col_silver(paste0(
+      "Run {.run specifyr::error_spec()} to ",
+      "get the expected specificiation of {.arg {arg_name}}."
+    ))
+  }
+}

@@ -16,3 +16,4 @@ Imports:
     vctrs
 URL: https://github.com/EthanSansom/specifyr
 BugReports: https://github.com/EthanSansom/specifyr/issues
+RoxygenNote: 7.2.1
