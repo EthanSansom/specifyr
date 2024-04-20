@@ -1,34 +1,57 @@
 # class ------------------------------------------------------------------------
 
-new_check <- function(check) {
+new_check <- function(check, title) {
   stopifnot(rlang::is_function(check))
-  structure(check, class = "specifyr_obj_check")
+  stopifnot(rlang::is_scalar_character(title))
+  structure(check, title = title, class = "specifyr_obj_check")
 }
 
-# TODO Ethan:
-# Add a `title` argument (by default rlang::caller_arg(.pred)) which can be used
-# when formatting the check.
-check <- function(.pred, .msg, .msg_env = rlang::base_env()) {
+check <- function(
+    .pred,
+    .msg,
+    .title = rlang::caller_arg(.pred),
+    .msg_env = rlang::base_env()
+  ) {
 
   stop_wrong_vec(.msg, cls = "character", nas = FALSE)
-  if (!rlang::is_function(.pred)) {
+  stop_wrong_vec(.title, cls = "character", len = 1L, nas = FALSE)
+  if (!rlang::is_environment(.msg_env)) {
     cli::cli_abort(
-      "{.arg .pred} must be a function, not {.obj_type_friendly {(.pred)}.",
+      "{.arg .msg_env} must be an environment, not {.obj_type_friendly {(.msg_env)}.",
       class = c("specifyr_error_api", "specifyr_error")
     )
   }
+  if (!(rlang::is_function(.pred) || rlang::is_formula(.pred, lhs = FALSE))) {
+    not <- if (rlang::is_formula(.pred)) {
+      "a two sided formula."
+    } else {
+      "{.obj_type_friendly {(.pred)}}."
+    }
+    cli::cli_abort(
+      paste("{.arg .pred} must be a function or a one sided formula, not", not),
+      class = c("specifyr_error_api", "specifyr_error")
+    )
+  }
+  .pred <- rlang::as_function(.pred)
 
   check_fn <- function(
     arg,
     arg_name = rlang::caller_arg(arg),
     error_call = rlang::caller_env(),
-    error_class = "specifyr_error_object_mispecified"
+    error_class = "specifyr_error_failed_check"
   ) {
 
-    # TODO Ethan: Improve this internal error
     results <- .pred(arg)
     if (!rlang::is_logical(results)) {
-      cli::abort("Can't check {.arg {arg_name}}.")
+      cli::cli_warn(
+        paste0(
+          "Checking argument {.arg {arg_name}} produced a {.cls {class(results)}} ",
+          "vector. Coercing to a {.cls logical} vector."
+        ),
+        call = error_call,
+        class = c("specifyr_warning_api", "specifyr_warning")
+      )
+      results <- as.logical(results)
     }
 
     loc <- which(is.na(results) | !results)
@@ -51,11 +74,64 @@ check <- function(.pred, .msg, .msg_env = rlang::base_env()) {
     TRUE
   }
 
-  new_check(check_fn)
-
+  new_check(check_fn, title = .title)
 }
 
 is_check <- function(x) inherits(x, "specifyr_obj_check")
+
+#' @export
+format.specifyr_obj_check <- function(x) {
+  attr(x, "title")
+}
+
+#' @export
+print.specifyr_obj_check <- function(x) {
+  cli::cat_line("<obj_check>")
+  cli::cat_line(format(x))
+  invisible(x)
+}
+
+check_must <- function(
+    .pred,
+    .must,
+    .title = rlang::caller_arg(.pred),
+    .msg_env = rlang::base_env()
+  ) {
+
+  stop_wrong_vec(.must, "character", len = 1L, nas = FALSE)
+  msg <- paste0("{.arg {arg_name}} must ", .must, ".")
+  rlang::try_fetch(
+    check(
+      .pred = .pred,
+      .msg = msg,
+      .title = .title,
+      .msg_env = .msg_env
+    ),
+    error = function(cnd) cli::cli_abort("", parent = cnd, .inherit = TRUE)
+  )
+}
+
+check_must_not <- function(
+    .pred,
+    .must,
+    .not,
+    .title = rlang::caller_arg(.pred),
+    .msg_env = rlang::base_env()
+) {
+
+  stop_wrong_vec(.must, "character", len = 1L, nas = FALSE)
+  stop_wrong_vec(.not, "character", len = 1L, nas = FALSE)
+  msg <- paste0("{.arg {arg_name}} must ", .must, ", not ", .not, ".")
+  rlang::try_fetch(
+    check(
+      .pred = .pred,
+      .msg = msg,
+      .title = .title,
+      .msg_env = .msg_env
+    ),
+    error = function(cnd) cli::cli_abort("", parent = cnd, .inherit = TRUE)
+  )
+}
 
 # internal ---------------------------------------------------------------------
 
