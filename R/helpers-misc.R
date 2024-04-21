@@ -1,4 +1,3 @@
-
 `%notin%` <- Negate(`%in%`)
 
 indices <- function(x) {
