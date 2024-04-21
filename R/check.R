@@ -1,17 +1,24 @@
 # class ------------------------------------------------------------------------
 
-check_blueprint <- function(predicate, message, message_env) {
+check_blueprint <- function(predicate, message, title, message_env) {
 
   stopifnot(rlang::is_function(predicate))
   stopifnot(rlang::is_character(message))
+  stopifnot(rlang::is_scalar_character(title))
   stopifnot(rlang::is_environment(message_env))
   structure(
     .Data = predicate,
     message = message,
+    title = title,
     message_env = message_env,
     class = "specifyr_obj_check_blueprint"
   )
 
+}
+
+#' @export
+format.specifyr_obj_check_blueprint <- function(x) {
+  format(attr(x, "title"))
 }
 
 check <- function(
@@ -47,6 +54,7 @@ check <- function(
   blueprint <- check_blueprint(
     predicate = rlang::as_function(.p),
     message = .msg,
+    title = .title,
     message_env = .msg_env
   )
   rm(.p, .msg, .msg_env)
