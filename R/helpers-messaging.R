@@ -44,7 +44,12 @@ as_index <- function(..., .recycled = FALSE) {
   if (.recycled) {
     n_dots <- length(dots)
     first_dots <- if (n_dots <= 1) "" else paste0("[[", dots[-n_dots], "]]")
-    last_dot <- paste0("[>=", dots[[n_dots]], "]")
+    last_dot <- dots[[n_dots]]
+    last_dot <- if (is.character(last_dot)) {
+      paste0("[", dots[[n_dots]], "]")
+    } else {
+      paste0("[>=", dots[[n_dots]], "]")
+    }
     return(paste(c(first_dots, last_dot), collapse = ""))
   }
   paste(paste0("[[", dots, "]]"), collapse = "")

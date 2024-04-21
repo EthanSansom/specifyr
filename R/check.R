@@ -1,80 +1,113 @@
 # class ------------------------------------------------------------------------
 
-new_check <- function(check, title) {
-  stopifnot(rlang::is_function(check))
-  stopifnot(rlang::is_scalar_character(title))
-  structure(check, title = title, class = "specifyr_obj_check")
+check_blueprint <- function(predicate, message, message_env) {
+
+  stopifnot(rlang::is_function(predicate))
+  stopifnot(rlang::is_character(message))
+  stopifnot(rlang::is_environment(message_env))
+  structure(
+    .Data = predicate,
+    message = message,
+    message_env = message_env,
+    class = "specifyr_obj_check_blueprint"
+  )
+
 }
 
 check <- function(
-    .pred,
-    .msg,
-    .title = rlang::caller_arg(.pred),
-    .msg_env = rlang::base_env()
+  .p,
+  .msg,
+  .title = rlang::caller_arg(.p),
+  .msg_env = rlang::caller_env()
   ) {
 
   stop_wrong_vec(.msg, cls = "character", nas = FALSE)
   stop_wrong_vec(.title, cls = "character", len = 1L, nas = FALSE)
   if (!rlang::is_environment(.msg_env)) {
     cli::cli_abort(
-      "{.arg .msg_env} must be an environment, not {.obj_type_friendly {(.msg_env)}.",
+      paste0(
+        "{.arg .msg_env} must be an environment, ",
+        "not {.obj_type_friendly {(.msg_env)}."
+      ),
       class = c("specifyr_error_api", "specifyr_error")
     )
   }
-  if (!(rlang::is_function(.pred) || rlang::is_formula(.pred, lhs = FALSE))) {
-    not <- if (rlang::is_formula(.pred)) {
+  if (!(rlang::is_function(.p) || rlang::is_formula(.p, lhs = FALSE))) {
+    not <- if (rlang::is_formula(.p)) {
       "a two sided formula."
     } else {
-      "{.obj_type_friendly {(.pred)}}."
+      "{.obj_type_friendly {(.p)}}."
     }
     cli::cli_abort(
-      paste("{.arg .pred} must be a function or a one sided formula, not", not),
+      paste("{.arg .p} must be a function or a one sided formula, not", not),
       class = c("specifyr_error_api", "specifyr_error")
     )
   }
-  .pred <- rlang::as_function(.pred)
 
-  check_fn <- function(
+  blueprint <- check_blueprint(
+    predicate = rlang::as_function(.p),
+    message = .msg,
+    message_env = .msg_env
+  )
+  rm(.p, .msg, .msg_env)
+  structure(
+    .Data = purrr::partial(assert_check_blueprint, blueprint = !!blueprint),
+    title = .title,
+    class = "specifyr_obj_check"
+  )
+
+}
+
+get_check_blueprint <- function(x) {
+  x_env <- rlang::fn_env(x)
+  x_env$blueprint
+}
+
+assert_check_blueprint <- function(blueprint, ...) {
+  UseMethod("assert_check_blueprint")
+}
+
+assert_check_blueprint.specifyr_obj_check_blueprint <- function(
+    blueprint,
     arg,
     arg_name = rlang::caller_arg(arg),
     error_call = rlang::caller_env(),
     error_class = "specifyr_error_failed_check"
   ) {
 
-    results <- .pred(arg)
-    if (!rlang::is_logical(results)) {
-      cli::cli_warn(
-        paste0(
-          "Checking argument {.arg {arg_name}} produced a {.cls {class(results)}} ",
-          "vector. Coercing to a {.cls logical} vector."
-        ),
-        call = error_call,
-        class = c("specifyr_warning_api", "specifyr_warning")
-      )
-      results <- as.logical(results)
-    }
-
-    loc <- which(is.na(results) | !results)
-    cli_env <- rlang::env(
-      .msg_env,
-      arg = arg,
-      arg_name = arg_name,
-      loc = loc,
-      at_loc = at_locations(loc)
+  results <- blueprint(arg)
+  if (!rlang::is_logical(results)) {
+    cli::cli_warn(
+      paste0(
+        "Checking argument {.arg {arg_name}} produced a {.cls {class(results)}} ",
+        "vector. Coercing to a {.cls logical} vector."
+      ),
+      call = error_call,
+      class = c("specifyr_warning_api", "specifyr_warning")
     )
-
-    if (!isTRUE(all(results))) {
-      cli::cli_abort(
-        c(.msg, error_spec_call_prompt(error_class)),
-        call = error_call,
-        class = c(error_class, "specifyr_error"),
-        .envir = cli_env
-      )
-    }
-    TRUE
+    results <- as.logical(results)
   }
 
-  new_check(check_fn, title = .title)
+  if (all(results)) {
+    return(TRUE)
+  }
+
+  loc <- which(is.na(results) | !results)
+  cli_env <- rlang::env(
+    attr(blueprint, "message_env"),
+    arg = arg,
+    arg_name = arg_name,
+    loc = loc,
+    at_loc = at_locations(loc)
+  )
+
+  cli::cli_abort(
+    c(attr(blueprint, "message"), error_spec_call_prompt(error_class)),
+    call = error_call,
+    class = c(error_class, "specifyr_error"),
+    .envir = cli_env
+  )
+
 }
 
 is_check <- function(x) inherits(x, "specifyr_obj_check")
@@ -92,9 +125,9 @@ print.specifyr_obj_check <- function(x) {
 }
 
 check_must <- function(
-    .pred,
+    .p,
     .must,
-    .title = rlang::caller_arg(.pred),
+    .title = rlang::caller_arg(.p),
     .msg_env = rlang::base_env()
   ) {
 
@@ -102,7 +135,7 @@ check_must <- function(
   msg <- paste0("{.arg {arg_name}} must ", .must, ".")
   rlang::try_fetch(
     check(
-      .pred = .pred,
+      .p = .p,
       .msg = msg,
       .title = .title,
       .msg_env = .msg_env
@@ -112,10 +145,10 @@ check_must <- function(
 }
 
 check_must_not <- function(
-    .pred,
+    .p,
     .must,
     .not,
-    .title = rlang::caller_arg(.pred),
+    .title = rlang::caller_arg(.p),
     .msg_env = rlang::base_env()
 ) {
 
@@ -124,7 +157,7 @@ check_must_not <- function(
   msg <- paste0("{.arg {arg_name}} must ", .must, ", not ", .not, ".")
   rlang::try_fetch(
     check(
-      .pred = .pred,
+      .p = .p,
       .msg = msg,
       .title = .title,
       .msg_env = .msg_env
@@ -179,7 +212,7 @@ check_vctr <- function(
     error_class = "specifyr_error_object_mispecified"
   ) {
 
-  if (!vctrs::obj_is_vector(arg)) {
+  if (!vctrs::obj_is_vector(arg) || inherits(arg, "data.frame")) {
     cli::cli_abort(
       c(
         "{.arg {arg_name}} must be a vector, not {.obj_type_friendly {arg}}.",
@@ -332,7 +365,7 @@ check_nm1 <- function(
 
 }
 
-check_attatched <- function(
+check_attached <- function(
     checks,
     arg,
     arg_name = rlang::caller_arg(arg),
@@ -340,8 +373,9 @@ check_attatched <- function(
     error_class = "specifyr_error_object_mispecified"
 ) {
 
-  for (predicate in checks) {
-    predicate(
+  for (check in checks) {
+    assert_check_blueprint(
+      check,
       arg = arg,
       arg_name = arg_name,
       error_call = error_call,

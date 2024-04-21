@@ -1,4 +1,3 @@
-
 # Store information about the last blueprint run
 the <- rlang::new_environment(
   data = list(
@@ -20,7 +19,7 @@ record_blueprint_success <- function() {
 
 # blueprint --------------------------------------------------------------------
 
-obj_blueprint <- function(.cls = "", .opt = FALSE, .checks = list()) {
+obj_blueprint <- function(.cls = NULL, .opt = FALSE, .checks = list()) {
   structure(
     .Data = list(cls = .cls, opt = .opt, checks = .checks),
     class = "specifyr_obj_blueprint"
@@ -32,7 +31,7 @@ is_obj_blueprint <- function(x) {
 }
 
 vec_blueprint <- function(
-    .cls = "",
+    .cls = NULL,
     .len = NULL,
     .nas = TRUE,
     .opt = FALSE,
@@ -115,7 +114,7 @@ format.specifyr_obj_blueprint <- function(x) {
 abbreviation.specifyr_obj_blueprint <- function(x) {
   paste0(
     "<",
-    if (x$cls == "") "object" else fmt_cls(x$cls),
+    if (is.null(x$cls)) "object" else fmt_cls(x$cls),
     fmt_opt(x$opt),
     fmt_checks(x$checks),
     ">"
@@ -131,7 +130,7 @@ format.specifyr_vec_blueprint <- function(x) {
 abbreviation.specifyr_vec_blueprint <- function(x) {
   paste0(
     "<",
-    if (x$cls == "") "vector" else fmt_cls(x$cls),
+    if (is.null(x$cls)) "vector" else fmt_cls(x$cls),
     fmt_len(x$len),
     fmt_nas(x$nas),
     fmt_opt(x$opt),
@@ -191,17 +190,17 @@ abbreviation.specifyr_lst_blueprint <- function(x) {
 
 # assert -----------------------------------------------------------------------
 
-assert_blueprint <- function(
+assert_spec_blueprint <- function(
     blueprint,
     arg,
     arg_name = rlang::caller_arg(arg),
     error_call = rlang::caller_env(),
     error_class = "specifyr_error_object_mispecified"
 ) {
-  UseMethod("assert_blueprint")
+  UseMethod("assert_spec_blueprint")
 }
 
-assert_blueprint.specifyr_obj_blueprint <- function(
+assert_spec_blueprint.specifyr_obj_blueprint <- function(
     blueprint,
     arg,
     arg_name = rlang::caller_arg(arg),
@@ -217,13 +216,13 @@ assert_blueprint.specifyr_obj_blueprint <- function(
 
   cls <- blueprint$cls
   if (is.null(cls)) check_cls(arg, cls = cls, arg_name, error_call, error_class)
-  check_attatched(blueprint$checks, arg, arg_name, error_call, error_class)
+  check_attached(blueprint$checks, arg, arg_name, error_call, error_class)
 
   record_blueprint_success()
   TRUE
 }
 
-assert_blueprint.specifyr_vec_blueprint <- function(
+assert_spec_blueprint.specifyr_vec_blueprint <- function(
     blueprint,
     arg,
     arg_name = rlang::caller_arg(arg),
@@ -245,13 +244,13 @@ assert_blueprint.specifyr_vec_blueprint <- function(
   }
   check_len(arg, len = blueprint$len, arg_name, error_call, error_class)
   if (!blueprint$nas) check_nas(arg, arg_name, error_call, error_class)
-  check_attatched(blueprint$checks, arg, arg_name, error_call, error_class)
+  check_attached(blueprint$checks, arg, arg_name, error_call, error_class)
 
   record_blueprint_success()
   TRUE
 }
 
-assert_blueprint.specifyr_lst_blueprint <- function(
+assert_spec_blueprint.specifyr_lst_blueprint <- function(
     blueprint,
     arg,
     arg_name = rlang::caller_arg(arg),
@@ -267,7 +266,7 @@ assert_blueprint.specifyr_lst_blueprint <- function(
 
   check_cls(arg, cls = "list", arg_name, error_call, error_class)
   check_len(arg, len = blueprint$len, arg_name, error_call, error_class)
-  check_attatched(blueprint$checks, arg, arg_name, error_call, error_class)
+  check_attached(blueprint$checks, arg, arg_name, error_call, error_class)
 
   # Ensures that the outer list blueprint, and not the blueprint of an element,
   # is recorded as the last blueprint.
@@ -302,7 +301,7 @@ assert_blueprint.specifyr_lst_blueprint <- function(
         error_class = error_class
       )
     }
-    assert_blueprint(
+    assert_spec_blueprint(
       blueprint = inner_blueprint,
       arg = arg[[i]],
       arg_name = inner_arg_name,

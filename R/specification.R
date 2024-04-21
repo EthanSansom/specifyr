@@ -5,10 +5,9 @@
 #   correct file
 
 # spec -------------------------------------------------------------------------
-new_spec <- function(blueprint, ...) {
+new_spec <- function(blueprint) {
   structure(
-    .Data = purrr::partial(assert_blueprint, blueprint = !!blueprint),
-    blueprint = blueprint,
+    .Data = purrr::partial(assert_spec_blueprint, blueprint = !!blueprint),
     class = gsub("_blueprint$", "_spec", class(blueprint))
   )
 }
@@ -117,72 +116,35 @@ stop_incompatible_dots_length <- function(
   }
 }
 
-# TODO Ethan:
-# This was made to prevent the last element to a list specification from being
-# named IF that element was to be recycled.
-#
-# Ex. `lst_spec(a = vec_spec("integer"), .len = 100L)`
-#
-# However! I now think it's fine to allow the last element to be recycled. For
-# instance, there might be a case where some API returns a named list with
-# recurring names OR some kind of wrapper (purrr::safely and friends) might
-# do the same. See a bad example below:
-#
-# Ex. list(payload = list(response = 400, ...), payload = list(response = 200, ...), ...)
-stop_named_recycled_element <- function(
-    dots,
-    .len,
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_api"
-  ) {
-
-  n_elements <- length(dots)
-  if (n_elements == 0 || identical(n_elements, .len)) {
-    return(invisible())
-  }
-
-  last_name <- rlang::names2(dots)[[n_elements]]
-  if (last_name != "") {
-    last_dot <- paste0("..", n_elements)
-    specified_len <- switch(
-      len_type(.len),
-      any = paste0("length in range [", n_elements, "-", "Inf)"),
-      range = paste0("length in range [", .len[[1]], "-", .len[[2]], "]"),
-      exact = paste0("length in range [", n_elements, "-", .len[[1]], "]")
-    )
-    # TODO Ethan: Make a GOOD vs. BAD example here, using the actual supplied length.
-    #
-    #> Good
-    #> lst_spec("int" = vec_spec("integer"), vec_spec("integer"), .len = user supplied .len)
-    #>
-    #> Bad
-    #> lst_spec("int" = vec_spec("integer"), .len = user supplied .len)
-    cli::cli_abort(
-      c(
-        "Can't recycle a named final element supplied to {.arg ...}.",
-        x = "Element {.arg {last_dot}} must be recycled to any {specified_len}.",
-        i = "Element {.arg {last_dot}} is named {.val {last_name}}."
-      ),
-      call = error_call,
-      class = error_class
-    )
-  }
-}
-
 is_obj_spec <- function(x) inherits(x, "specifyr_obj_spec")
 
-blueprint <- function(x) attr(x, "blueprint")
+# blueprint <- function(x) attr(x, "blueprint")
 
-attatch <- function(.spec, ...) {
+blueprint <- function(x) {
+  x_env <- rlang::fn_env(x)
+  x_env$blueprint
+}
+
+attach <- function(.spec, ...) {
 
   # TODO Ethan: Improve the error messages here
   dots <- rlang::list2(...)
   stopifnot(all(purrr::map_lgl(dots, is_check)))
   stopifnot(is_obj_spec(.spec))
 
-  new_blueprint <- blueprint(.spec)
-  new_blueprint$checks <- append(new_blueprint$checks, dots)
-  new_spec(new_blueprint)
+  spec_blueprint <- blueprint(.spec)
+  check_blueprints <- purrr::map(dots, get_check_blueprint)
+  spec_blueprint$checks <- append(spec_blueprint$checks, check_blueprints)
+  new_spec(spec_blueprint)
+}
+
+attached_checks <- function(x) {
+  blueprint <- blueprint(x)
+  if ("checks" %notin% rlang::names2(blueprint)) {
+    NULL
+  } else {
+    blueprint$checks
+  }
 }
 
 # printing ---------------------------------------------------------------------
@@ -199,23 +161,45 @@ abbreviation.specifyr_obj_spec <- function(x, ...) {
 
 #' @export
 print.specifyr_obj_spec <- function(x) {
-  cli::cat_line("<obj_spec>")
-  cli::cat_line(numbered(format(x), from = 0))
+  checks <- attached_checks(x)
+  cli::cat_line(c(
+    "<obj_spec>",
+    cli::cat_line(numbered(format(x)))
+  ))
+  if (!rlang::is_empty(checks)) {
+    cat("\n")
+    print_checks(checks)
+  }
   invisible(x)
 }
 
 #' @export
 print.specifyr_vec_spec <- function(x) {
-  cli::cat_line("<vec_spec>")
-  cli::cat_line(numbered(format(x), from = 0))
+  checks <- attached_checks(x)
+  cli::cat_line(c(
+    "<vec_spec>",
+    numbered(format(x))
+  ))
+  if (!rlang::is_empty(checks)) {
+    cat("\n")
+    print_checks(checks)
+  }
   invisible(x)
 }
 
 #' @export
 print.specifyr_lst_spec <- function(x, width = NULL) {
+  checks <- attached_checks(x)
   width <- width %||% cli::console_width()
-  cli::cat_line("<lst_spec>")
-  writeLines(numbered(format_lst_blueprint_elements(blueprint(x))))
+  cli::cat_line(c(
+    "<lst_spec>",
+    numbered(format_lst_blueprint_elements(blueprint(x)), from = 0)
+  ))
+  if (!rlang::is_empty(checks)) {
+    cat("\n")
+    print_checks(checks)
+  }
+  invisible(x)
 }
 
 format_lst_blueprint_elements <- function(x, prefix = "") {
@@ -234,8 +218,9 @@ format_lst_blueprint_elements <- function(x, prefix = "") {
     return(header)
   }
 
+  n_elements <- length(x_elements)
   elements_indices <- indices(x_elements)
-  last_index <- elements_indices[[length(elements_indices)]]
+  last_index <- elements_indices[[n_elements]]
   recycled <- last_element_recycled(x)
 
   body <- purrr::list_c(purrr::map2(
@@ -247,9 +232,20 @@ format_lst_blueprint_elements <- function(x, prefix = "") {
       format_lst_blueprint_elements(element, prefix = prefix)
     }
   ))
-
   c(header, body)
+}
 
+print_checks <- function(checks) {
+  n_checks <- length(checks)
+  header <- if (n_checks == 1) {
+    "[*] 1 Additional Check:"
+  } else {
+    paste("[*]", n_checks, "Additional Checks:")
+  }
+  cli::cat_line(c(
+    style_subtle(header),
+    lettered(purrr::map_chr(checks, format))
+  ))
 }
 
 # TODO Ethan:

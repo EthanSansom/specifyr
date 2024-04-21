@@ -1,6 +1,6 @@
 style_subtle <- cli::make_ansi_style("#A9A9A9")
 
-numbered <- function(x, from = 0) {
+numbered <- function(x, from = 1) {
   x_length <- length(x)
   if (x_length <= 0) {
     return("")
@@ -32,7 +32,7 @@ fmt_opt <- function(opt) {
 }
 
 fmt_cls <- function(cls) {
-  if (is.null(cls)) "" else paste(cls, collapse = "/")
+  if (is.null(cls)) "" else paste(cls, collapse = "|")
 }
 
 fmt_len <- function(len) {
