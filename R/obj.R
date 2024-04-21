@@ -53,7 +53,7 @@ spec_blueprint <- function(x) {
 
 spec_checks <- function(x) {
   blueprint <- spec_blueprint(x)
-  x$check_blueprints
+  blueprint$check_blueprints
 }
 
 # formatting -------------------------------------------------------------------

@@ -63,6 +63,11 @@ format.specifyr_vec_spec <- function(x) {
 }
 
 #' @export
+format.specifyr_vec_blueprint <- function(x) {
+  abbreviation(x)
+}
+
+#' @export
 print.specifyr_vec_spec <- function(x) {
   checks <- spec_checks(x)
   cli::cat_line(c(

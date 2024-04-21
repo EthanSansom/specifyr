@@ -11,7 +11,7 @@ check <- function(
     cli::cli_abort(
       paste0(
         "{.arg msg_env} must be an environment, ",
-        "not {.obj_type_friendly {(msg_env)}."
+        "not {.obj_type_friendly {msg_env}}."
       ),
       class = c("specifyr_error_api", "specifyr_error")
     )
@@ -20,7 +20,7 @@ check <- function(
     not <- if (rlang::is_formula(p)) {
       "a two sided formula."
     } else {
-      "{.obj_type_friendly {(p)}}."
+      "{.obj_type_friendly {p}}."
     }
     cli::cli_abort(
       paste("{.arg p} must be a function or a one sided formula, not", not),
@@ -96,7 +96,7 @@ check_blueprint <- function(p, msg, title, msg_env) {
   stopifnot(rlang::is_environment(msg_env))
   structure(
     .Data = p,
-    message = msg,
+    msg = msg,
     title = title,
     msg_env = msg_env,
     class = "specifyr_obj_check_blueprint"
@@ -173,5 +173,4 @@ assert_check_blueprint.specifyr_obj_check_blueprint <- function(
     class = c(error_class, "specifyr_error"),
     .envir = cli_env
   )
-
 }

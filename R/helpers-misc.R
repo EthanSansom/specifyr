@@ -11,7 +11,7 @@ indices <- function(x) {
 }
 
 len_type <- function(len) {
-  if (is.null(len)) {
+  if (rlang::is_empty(len)) {
     "any"
   } else if (length(len) == 2) {
     "range"

@@ -63,17 +63,16 @@ check_len <- function(
     error_class = "specifyr_error_object_mispecified"
 ) {
 
-  len_length <- length(len)
-  if (len_length == 1) {
-    check_len_exact(
+  switch(
+    len_type(len),
+    exact = check_len_exact(
       arg = arg,
       len = len,
       arg_name = arg_name,
       error_call = error_call,
       error_class = error_class
-    )
-  } else if (len_length == 2) {
-    check_len_range(
+    ),
+    range = check_len_range(
       arg = arg,
       min_len = len[[1]],
       max_len = len[[2]],
@@ -81,7 +80,7 @@ check_len <- function(
       error_call = error_call,
       error_class = error_class
     )
-  }
+  )
 
 }
 

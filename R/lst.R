@@ -15,7 +15,7 @@ lst_spec <- function(..., .len = NULL, .opt = FALSE) {
   stop_incompatible_dots_len(dots, .len)
 
   blueprint <- lst_blueprint(
-    !!!purrr::map(dots, blueprint),
+    !!!purrr::map(dots, spec_blueprint),
     .len = as.integer(.len),
     .opt = .opt
   )

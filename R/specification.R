@@ -51,12 +51,12 @@ add_checks <- function(.spec, ...) {
     )
   }
 
-  spec_blueprint <- blueprint(.spec)
-  spec_blueprint$check_blueprints <- append(
-    spec_blueprint$check_blueprints,
+  blueprint <- spec_blueprint(.spec)
+  blueprint$check_blueprints <- append(
+    blueprint$check_blueprints,
     purrr::map(dots, get_check_blueprint)
   )
-  new_spec(spec_blueprint)
+  new_spec(blueprint)
 }
 
 # subsetting -------------------------------------------------------------------
