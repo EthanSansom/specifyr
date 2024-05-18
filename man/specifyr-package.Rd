@@ -4,9 +4,9 @@
 \name{specifyr-package}
 \alias{specifyr}
 \alias{specifyr-package}
-\title{specifyr: What the Package Does (Title Case)}
+\title{specifyr: Fast Type Checking}
 \description{
-More about what it does (maybe more than one line) Use four spaces when indenting paragraphs within the Description.
+Generate functions to quickly check the structure of an object.
 }
 \seealso{
 Useful links:

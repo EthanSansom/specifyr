@@ -62,7 +62,9 @@ specifyr_internal_error <- function(
     arg_name = rlang::caller_arg(x),
     error_call = rlang::caller_env()
 ) {
-  test_call <- rlang::call2(fn_name, arg, .ns = fn_ns)
+  # `quote(arg)` prevents a confusing chain of events: If `arg = sym("x")` then
+  # `call2(is.symbol, arg)` produces `is.symbol(x)` instead of `is.symbol(arg)`.
+  test_call <- rlang::call2(fn_name, quote(arg), .ns = fn_ns)
   if (!isTRUE(eval(test_call))) {
     cli::cli_abort(
       specifyr_internal_error_message(arg_name, fn_name),

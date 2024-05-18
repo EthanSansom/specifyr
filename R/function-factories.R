@@ -15,14 +15,6 @@
 #
 # - a list of characters  -> is target_cls[[1]] || ... || is target_cls[[n]]
 
-emit_cls_error <- function(...) {
-  cli::cat_line("You caught a class error!")
-}
-
-emit_cls_error_multi <- function(...) {
-  cli::cat_line("You caught a multi-class error!")
-}
-
 cls_check_body <- function(x, error_index, target_cls) {
 
   specifyr_internal_error(x, "is.symbol")
@@ -30,8 +22,7 @@ cls_check_body <- function(x, error_index, target_cls) {
 
   rlang::expr(
     if (!!cls_test_body(x, target_cls, negate = TRUE)) {
-      # TODO Ethan: Make sure to add namespace `specifyr::`!
-      emit_cls_error(
+      specifyr::emit_cls_error(
         x = !!x,
         x_name = x_name,
         x_index = !!error_index,
@@ -57,8 +48,7 @@ cls_check_body_multi <- function(x, x_indices, error_index, target_cls) {
 
   rlang::expr(
     if (!!cls_test_body_multi(x, target_cls, negate = TRUE)) {
-      # TODO Ethan: Make sure to add namespace `specifyr::`!
-      emit_cls_error_multi(
+      specifyr::emit_cls_error_multi(
         x = !!x,
         x_name = x_name,
         x_index = !!error_index,
@@ -70,7 +60,7 @@ cls_check_body_multi <- function(x, x_indices, error_index, target_cls) {
   )
 }
 
-cls_test_body <- function(x, target_cls) {
+cls_test_body <- function(x, target_cls, negate = FALSE) {
   call <- switch(
     target_cls_type(target_cls),
     # Ex. `is.numeric(c(1, 2, 3))`
@@ -140,6 +130,62 @@ is_recognized_cls <- function(target_cls) {
   !is.null(cls_test_fn_name(target_cls))
 }
 
+#' @export
+emit_cls_error <- function(
+    x,
+    x_name,
+    x_index,
+    error_call,
+    error_class,
+    cls
+  ) {
+  indexed_name <- paste0(x_name, format_index(x_index))
+  cli::cli_abort(
+    c(
+      "{.arg {indexed_name}} must be class {.cls {cls}}.",
+      x = "{.arg {indexed_name}} is class {.cls {class(x)}}."
+    ),
+    call = error_call,
+    class = error_class,
+    x_name = x_name,
+    x_index = x_index
+  )
+}
+
+#' @export
+emit_cls_error_multi <- function(
+    x,
+    x_name,
+    x_index,
+    error_call,
+    error_class,
+    cls
+  ) {
+  # We need to re-test the classes of `x`'s elements. Re-generating the class
+  # check functions using `cls_test_body` ensures that we get the same results
+  # which caused the original class error.
+  cls_tests <- purrr::map(
+    cls,
+    \(cls) {
+      rlang::new_function(
+        args = pairlist2(x = ),
+        body = cls_test_body(sym("x"), cls)
+      )
+    }
+  )
+  error_at <- which.min(purrr::map2_lgl(cls_tests, x, \(f, x) isTRUE(f(x))))
+  # `as.numeric(error_at)` prevents integer index formatting (i.e. [[1]] not [[1L]])
+  error_index <- append(x_index, as.numeric(error_at))
+  emit_cls_error(
+    x = x[[error_at]],
+    x_name = x_name,
+    x_index = error_index,
+    error_call = error_call,
+    error_class = error_class,
+    cls = cls[[error_at]]
+  )
+}
+
 # Test `cls_check_body_multi`
 if (FALSE) {
   # Test with a simple case
@@ -177,14 +223,6 @@ if (FALSE) {
 # 1 or 2 integerish number. If length 2, then `len[[1]] < len[[2]]`. And, can't
 # both be infinite. AND min length is 0 or more.
 
-emit_len_error <- function(...) {
-  cli::cat_line("You caught a length error!")
-}
-
-emit_len_error_multi <- function(...) {
-  cli::cat_line("You caught a multi-length error!")
-}
-
 len_check_body <- function(x, error_index, target_len) {
 
   specifyr_internal_error(x, "is.symbol")
@@ -192,8 +230,7 @@ len_check_body <- function(x, error_index, target_len) {
 
   rlang::expr(
     if (!!len_test_body(x, target_len, negate = TRUE)) {
-      # TODO Ethan: Make sure to add namespace `specifyr::`!
-      emit_len_error(
+      specifyr::emit_len_error(
         x = !!x,
         x_name = x_name,
         x_index = !!error_index,
@@ -218,8 +255,7 @@ len_check_body_multi <- function(x, x_indices, error_index, target_len) {
 
   rlang::expr(
     if (!!len_test_body_multi(x, target_len, negate = TRUE)) {
-      # TODO Ethan: Make sure to add namespace `specifyr::`!
-      emit_len_error_multi(
+      specifyr::emit_len_error_multi(
         x = !!x,
         x_name = x_name,
         x_index = !!error_index,
@@ -267,7 +303,10 @@ len_test_body <- function(x, target_len, negate = FALSE) {
           rlang::expr(between1(length(!!x), !!min_len, !!max_len))
         }
       }
-    }
+    },
+
+    # We don't care about the length
+    any = if (negate) rlang::expr(FALSE) else rlang::expr(TRUE)
   )
 }
 
@@ -315,7 +354,9 @@ len_test_body_multi <- function(x, target_lens, negate = FALSE) {
 
 target_len_type_single <- function(target_len) {
   target_len_n <- length(target_len)
-  if (target_len_n == 1) {
+  if (is.null(target_len)) {
+    "any"
+  } else if (target_len_n == 1) {
     "exact"
   } else if (target_len_n == 2) {
     "range"
@@ -332,6 +373,76 @@ target_len_type_multi <- function(target_lens) {
   } else {
     cli::cli_abort("Can't assign type to `target_len`", .internal = TRUE)
   }
+}
+
+#' @export
+emit_len_error <- function(
+    x,
+    x_name,
+    x_index,
+    error_call,
+    error_class,
+    len
+) {
+  indexed_name <- paste0(x_name, format_index(x_index))
+  expected_len <- switch(
+    target_len_type_single(len),
+    exact = "be length {len}",
+    range = "have length in range [{len[[1]]}, {len[[2]]}]"
+  )
+  message <- paste0("{.arg {indexed_name}} must ", expected_len, ".")
+  cli::cli_abort(
+    c(
+      message,
+      x = "{.arg {indexed_name}} is length {length(x)}."
+    ),
+    call = error_call,
+    class = error_class,
+    x_name = x_name,
+    x_index = x_index
+  )
+}
+
+#' @export
+emit_len_error_multi <- function(
+    x,
+    x_name,
+    x_index,
+    error_call,
+    error_class,
+    len
+) {
+  len_tests <- purrr::map(
+    len,
+    \(len) {
+      rlang::new_function(
+        args = pairlist2(x = ),
+        body = len_test_body(sym("x"), len)
+      )
+    }
+  )
+  error_at <- which.min(purrr::map2_lgl(len_tests, x, \(f, x) isTRUE(f(x))))
+  error_index <- append(x_index, as.numeric(error_at))
+  emit_len_error(
+    x = x[[error_at]],
+    x_name = x_name,
+    x_index = error_index,
+    error_call = error_call,
+    error_class = error_class,
+    len = len[[error_at]]
+  )
+}
+
+# Test `emit_len_error_multi`
+if (FALSE) {
+  emit_len_error_multi(
+    x = list(1, 1:5, 2, numeric(0L)),
+    x_name = "x",
+    x_index = list(),
+    error_call = caller_env(),
+    error_class = "eerrr",
+    len = list(c(0, 10), NULL, 1:2, c(1, 20))
+  )
 }
 
 # Test `len_check_body_multi`
@@ -453,14 +564,6 @@ if (FALSE) {
 # TODO Ethan:
 # Don't allow users to specify an `NA` check if the expected length is exactly 0.
 
-emit_nas_error <- function(...) {
-  cli::cat_line("You caught an NA error!")
-}
-
-emit_nas_error_multi <- function(...) {
-  cli::cat_line("You caught a multi-NA error!")
-}
-
 # We incorporate `target_len` so we can use `is.na` instead of `all(is.na())`
 # on length 1 inputs and handle 0 length cases.
 nas_check_body <- function(x, error_index, target_len = NULL) {
@@ -470,8 +573,7 @@ nas_check_body <- function(x, error_index, target_len = NULL) {
 
   rlang::expr(
     if (!!nas_test_body(x, target_len, negate = FALSE)) {
-      # TODO Ethan: Make sure to add namespace `specifyr::`!
-      emit_nas_error(
+      specifyr::emit_nas_error(
         x = !!x,
         x_name = x_name,
         x_index = !!error_index,
@@ -495,8 +597,7 @@ nas_check_body_multi <- function(x, x_indices, error_index, target_lens = NULL) 
 
   rlang::expr(
     if (!!nas_test_body_multi(x, target_lens, negate = FALSE)) {
-      # TODO Ethan: Make sure to add namespace `specifyr::`!
-      emit_nas_error_multi(
+      specifyr::emit_nas_error_multi(
         x = !!x,
         x_name = x_name,
         x_index = !!error_index,
@@ -588,6 +689,57 @@ target_len_max_single <- function(target_len) {
   } else {
     cli::cli_abort("Can't get maximum of `target_len`", .internal = TRUE)
   }
+}
+
+#' @export
+emit_nas_error <- function(
+    x,
+    x_name,
+    x_index,
+    error_call,
+    error_class
+) {
+  indexed_name <- paste0(x_name, format_index(x_index))
+  cli::cli_abort(
+    c(
+      "{.arg {indexed_name}} must contain no NA or NaN values.",
+      x = "{.arg {indexed_name}} is NA or NaN {at_locations(is.na(x))}."
+    ),
+    call = error_call,
+    class = error_class,
+    x_name = x_name,
+    x_index = x_index
+  )
+}
+
+#' @export
+emit_nas_error_multi <- function(
+    x,
+    x_name,
+    x_index,
+    error_call,
+    error_class
+) {
+  error_at <- which.max(vapply(x, \(x) any(is.na(x)), logical(1L)))
+  error_index <- append(x_index, as.numeric(error_at))
+  emit_nas_error(
+    x = x[[error_at]],
+    x_name = x_name,
+    x_index = error_index,
+    error_call = error_call,
+    error_class = error_class
+  )
+}
+
+# Test `emit_nas_error_multi`
+if (FALSE) {
+  emit_nas_error_multi(
+    x = list(1, 2, 3, numeric(0L), c(1, 2, 3, NA, NA, NA, 5), NA, 10),
+    x_name = "x",
+    x_index = list(),
+    error_call = caller_env(),
+    error_class = "errr"
+  )
 }
 
 # Test `nas_test_body_multi` and `nas_test_body`
@@ -737,6 +889,77 @@ if (FALSE) {
 
   # Returns TRUE
   f()
+}
+
+# vctr -------------------------------------------------------------------------
+
+# If no class is provided to `vector_spec`, we still want to check that the object
+# is vector-like.
+
+emit_vctr_error <- function(...) {
+  cli::cat_line("You caught a vector error!")
+}
+
+emit_vctr_error_multi <- function(...) {
+  cli::cat_line("You caught a multi-vector error!")
+}
+
+vctr_check_body <- function(x, error_index) {
+
+  specifyr_internal_error(x, "is.symbol")
+  specifyr_internal_error(error_index, "is.list")
+
+  rlang::expr(
+    if (!!vctr_test_body(x, negate = TRUE)) {
+      # TODO Ethan: Make sure to add namespace `specifyr::`!
+      emit_vctr_error(
+        x = !!x,
+        x_name = x_name,
+        x_index = !!error_index,
+        error_call = error_call,
+        error_class = error_class
+      )
+    }
+  )
+}
+
+vctr_check_body_multi <- function(x, x_indices, error_index) {
+
+  specifyr_internal_error(x, "is.symbol")
+  specifyr_internal_error(x_indices, "is.integer")
+  specifyr_internal_error(error_index, "is.list")
+
+  # If indices are provided, we want to check the object `x` only at the
+  # specified `x_indices`.
+  if (!rlang::is_empty(x_indices)) {
+    x <- rlang::call2("[", x, x_indices)
+  }
+
+  rlang::expr(
+    if (!!vctr_test_body_multi(x, negate = TRUE)) {
+      # TODO Ethan: Make sure to add namespace `specifyr::`!
+      emit_vctr_error_multi(
+        x = !!x,
+        x_name = x_name,
+        x_index = !!error_index,
+        error_call = error_call,
+        error_class = error_class
+      )
+    }
+  )
+}
+
+vctr_test_body <- function(x, negate = FALSE) {
+  if (negate) {
+    rlang::expr(is.data.frame(!!x) || is.list(!!x) || !vctrs::obj_is_vector(!!x))
+  } else {
+    rlang::expr(!is.data.frame(!!x) && !is.list(!!x) && vctrs::obj_is_vector(!!x))
+  }
+}
+
+# TODO: Implement
+vctr_test_body_multi <- function(x, negate = FALSE) {
+
 }
 
 # utils ------------------------------------------------------------------------

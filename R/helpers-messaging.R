@@ -20,3 +20,27 @@ numbered <- function(x, from = 1) {
   numbers <- style_subtle(formatC(numbers, width = max(nchar(numbers))))
   paste(numbers, x)
 }
+
+at_locations <- function(locations, n_max = 5) {
+  if (is.logical(locations)) {
+    locations <- as.numeric(which(vapply(locations, isTRUE, logical(1L))))
+  }
+  specifyr_internal_error(locations, "is_integerish", "rlang")
+  n_locations <- length(locations)
+  prefix <- if (min(n_locations, n_max) == 1) "at location " else "at locations "
+  if (n_locations > n_max) {
+    at <- deparse(locations[seq(n_max)])
+    paste0(prefix, "`", at, "` and ", n_locations - n_max, " more")
+  } else {
+    paste0(prefix, "`", deparse(locations), "`")
+  }
+}
+
+format_index <- function(index) {
+  specifyr_internal_error(index, "is.list")
+  if (is_empty(index)) {
+    ""
+  } else {
+    paste(paste0("[[", purrr::map_chr(index, deparse), "]]"), collapse = "")
+  }
+}
