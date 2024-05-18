@@ -1,11 +1,10 @@
 Package: specifyr
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Fast Type Checking
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
+Author: Ethan Sansom
+Maintainer: Ethan Sansom <ethan.sansom29 at gmail.com>
+Description: Generate functions to quickly check the structure of an object.
 License: GPL (>= 3)
 Encoding: UTF-8
 LazyData: true
