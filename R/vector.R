@@ -43,24 +43,18 @@ vector_check_fn <- function(
   ) {
 
   error_index <- list()
+  x <- rlang::sym("x")
 
-  null_return <- if (null) {
-    null_return_body(rlang::sym("x"), error_index, spec_null_return)
-  }
-  missing_return <- if (missing) {
-    missing_return_body(rlang::sym("x"), error_index, spec_null_return)
-  }
+  null_return <- if (null) null_return_body(x, error_index, spec_null_return)
+  missing_return <- if (missing) missing_return_body(x, error_index, spec_null_return)
+
   cls_check <- if (is.null(cls)) {
-    vctr_check_body(rlang::sym("x"), error_index)
+    vctr_check_body(x, error_index)
   } else {
-    cls_check_body(rlang::sym("x"), error_index, cls)
+    cls_check_body(x, error_index, cls)
   }
-  len_check <- if (!is.null(len)) {
-    len_check_body(rlang::sym("x"), error_index, target_len = len)
-  }
-  nas_check <- if (!nas) {
-    nas_check_body(rlang::sym("x"), error_index, target_len = len)
-  }
+  len_check <- if (!is.null(len)) len_check_body(x, error_index, target_len = len)
+  nas_check <- if (!nas) nas_check_body(x, error_index, target_len = len)
 
   body <- expr_squash(
     missing_return,
