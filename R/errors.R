@@ -49,11 +49,38 @@ stop_contains_nas <- function(
 
 }
 
+specifyr_error <- function(
+    ...,
+    .error_call = rlang::caller_env(),
+    .error_class = "specifyr_error_api"
+  ) {
+  cli::cli_abort(
+    c(...),
+    call = .error_call,
+    class = .error_class,
+    .envir = rlang::caller_env()
+  )
+}
+
 # internal ---------------------------------------------------------------------
 
 # This is inspired by `assertthat` (https://github.com/hadley/assertthat). While
 # it feels a little illegal, does make for some more informative internal errors
 # for my benefit while keeping the call terse.
+
+specifyr_internal_error_if_not <- function(
+    predicate,
+    message,
+    error_call = rlang::caller_env()
+  ) {
+  if (!isTRUE(predicate)) {
+    cli::cli_abort(
+      message,
+      call = error_call,
+      .internal = TRUE
+    )
+  }
+}
 
 specifyr_internal_error <- function(
     arg,
@@ -87,11 +114,14 @@ specifyr_internal_error_message <- function(arg_name, fn_name) {
     "is.list" = "a list.",
     "is.symbol" = "a symbol.",
     "is.function" = "a function.",
+    "is.call" = "a call.",
     # rlang::
     "is_bool" = "a single TRUE of FALSE value.",
     "is_string" = "a non-NA length-1 character.",
     "is_integerish" = "an integerish number.",
     "is_scalar_integerish" = "a length-1 integerish number.",
+    "is_quosure" = "a quosure.",
+    "is_expression" = "a defused expression.",
     cli::cli_abort(
       "Can't construct message for `fn_name = {.val {fn_name}}`.",
       .internal = TRUE

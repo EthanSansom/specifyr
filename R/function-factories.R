@@ -62,36 +62,54 @@ cls_check_body_multi <- function(x, x_indices, error_index, target_cls) {
 
 cls_test_body <- function(x, target_cls, negate = FALSE) {
   call <- switch(
-    target_cls_type(target_cls),
+    target_cls_type_single(target_cls),
     # Ex. `is.numeric(c(1, 2, 3))`
     recognized = rlang::call2(sym(cls_test_fn_name(target_cls)), x),
     # Ex. `inherits(tibble(), "tbl")`
     string = rlang::expr(inherits(!!x, !!target_cls)),
     # Ex. `inherits_all(tibble(), c("tbl", "data.frame"))`
-    character = rlang::expr(rlang::inherits_all(!!x, !!target_cls))
+    character = rlang::expr(rlang::inherits_all(!!x, !!target_cls)),
+    # Ex. `is.numeric(x) || is.integer(x) || inherits(x, "my_class")`
+    list = {
+      cls_tests <- lapply(target_cls, cls_test_body, x = x, negate = FALSE)
+      expr_or(!!!cls_tests)
+    }
   )
   if (negate) rlang::call2("!", call) else call
 }
 
 cls_test_body_multi <- function(x, target_cls, negate = FALSE) {
   call <- switch(
-    target_cls_type(target_cls),
+    target_cls_type_multi(target_cls),
     # Ex. `vapply(list(1, 2, 3), is.numeric, logical(1L)`
     recognized = {
-      fn <- sym(cls_test_fn_name(target_cls))
+      fn <- rlang::sym(cls_test_fn_name(target_cls))
       rlang::expr(all(vapply(!!x, !!fn, logical(1L))))
     },
+
     # Ex. `vapply(list(tibble(), tibble()), inherits, logical(1L), what = "tbl")`
     string = rlang::expr(all(vapply(!!x, inherits, logical(1L), what = !!target_cls))),
+
     # Ex. `mapply(inherits, list(1, "A", 3L), c("numeric", "character", "integer"))`
     character = rlang::expr(all(mapply(inherits, !!x, !!target_cls))),
+
     # Ex. `mapply(inherits_all, list(tibble(), TRUE), list(c("tbl", "data.frame"), "logical"))`
-    list = rlang::expr(all(mapply(rlang::inherits_all, !!x, !!target_cls)))
+    list_of_character = rlang::expr(all(mapply(rlang::inherits_all, !!x, !!target_cls))),
+
+    # If the target class is a list of lists, it contains only one inner list
+    # (ex. `list(list("integer", "numeric"))`). If more options arise, might have
+    # to make an `expected_cls` class to manage the options.
+    #
+    # Ex. `vapply(list(1, 10L), \(x) is.numeric(x) || is.integer(x), logical(1L))`
+    list_of_list = {
+      body <- cls_test_body(x, target_cls[[1]], negate = FALSE)
+      rlang::expr(all(vapply(!!x, \(x) { !!body }, logical(1L))))
+    }
   )
   if (negate) rlang::call2("!", call) else call
 }
 
-target_cls_type <- function(target_cls) {
+target_cls_type_single <- function(target_cls) {
   if (is_recognized_cls(target_cls)) {
     "recognized"
   } else if (rlang::is_string(target_cls)) {
@@ -100,6 +118,24 @@ target_cls_type <- function(target_cls) {
     "character"
   } else if (is.list(target_cls)) {
     "list"
+  } else {
+    cli::cli_abort("Can't assign type to `target_cls`", .internal = TRUE)
+  }
+}
+
+target_cls_type_multi <- function(target_cls) {
+  if (is_recognized_cls(target_cls)) {
+    "recognized"
+  } else if (rlang::is_string(target_cls)) {
+    "string"
+  } else if (is.character(target_cls)) {
+    "character"
+  } else if (is.list(target_cls) && !is_empty(target_cls)) {
+    if (is.list(target_cls[[1]])) {
+      "list_of_list"
+    } else {
+      "list_of_character"
+    }
   } else {
     cli::cli_abort("Can't assign type to `target_cls`", .internal = TRUE)
   }
@@ -139,10 +175,17 @@ emit_cls_error <- function(
     error_class,
     cls
   ) {
+
   indexed_name <- paste0(x_name, format_index(x_index))
+  expected_class <- if (target_cls_type_single(cls) == "list") {
+    oxford(paste0("{.cls {cls[[", seq_along(cls), "]]}}"), sep2 = " or ")
+  } else {
+    "{.cls {cls}}"
+  }
+
   cli::cli_abort(
     c(
-      "{.arg {indexed_name}} must be class {.cls {cls}}.",
+      paste0("{.arg {indexed_name}} must be class ", expected_class, "."),
       x = "{.arg {indexed_name}} is class {.cls {class(x)}}."
     ),
     call = error_call,
