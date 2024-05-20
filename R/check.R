@@ -83,52 +83,32 @@ evalidate_predicate <- function(defused_predicate, error_call = rlang::caller_en
   }
 
   # `predicate` might be an anonymous function, in which case the outer call will
-  # be `function()`.
+  # be `function()`. If that call has only one argument `x`, take the body of the
+  # function (i.e `\(x) { f(x) }` becomes `f(x)`), otherwise treat as you would a
+  # named function.
   if (rlang::is_call(defused_predicate, "function")) {
-    # predicate <- rlang::eval_tidy(defused_predicate)
-    # predicate_fmls <- rlang::fn_fmls_names(predicate)
-    # if (!identical(predicate_fmls, "x")) {
-    #   n_fmls <- length(predicate_fmls)
-    #   has_fmls <- if (n_fmls > 5) {
-    #     paste("has formal arguments {.arg {predicate_fmls[1:5]}} and", n_fmls - 5, "more")
-    #   } else {
-    #     "has {n_fmls} formal argument{?s} {.arg {predicate_fmls}}"
-    #   }
-    #   example <- c(
-    #     " ",
-    #     " " = "# Good",
-    #     " " = 'specifyr::check(predicate = \(x) isTRUE(x == 1), message = "{{.arg x}} must be 1.")',
-    #     " ",
-    #     " " = "# Bad",
-    #     " " = 'specifyr::check(predicate = \(arg) isTRUE(arg == 1), message = "{{.arg arg}} must be 1.")',
-    #     " " = 'specifyr::check(predicate = \(x, val = 1) isTRUE(x == val), message = "{{.arg arg}} must be {{val}}.")',
-    #     " "
-    #   )
-    #   specifyr_error(
-    #     c(
-    #       "Can't convert the anonymous function {.arg predicate} to a call.",
-    #       i = "If {.arg predicate} is an anonymous function, it must have one formal argument {.arg x}.",
-    #       x = "{.arg predicate} {has_fmls}.",
-    #       example
-    #     ),
-    #     .error_call = error_call
-    #   )
-    # }
+    predicate <- rlang::eval_tidy(defused_predicate)
+    if (identical(rlang::fn_fmls_names(predicate), "x")) {
+      return(rlang::fn_body(predicate))
+    }
     return(rlang::call2(defused_predicate, rlang::sym("x")))
   }
 
   # When `predicate` is a call, we want to make sure that the symbol `x` is one
-  # of it's supplied arguments. If `predicate` is a name-spaced call, we'll want
-  # to inspect the next call.
+  # of it's supplied arguments. If `predicate` is a name-spaced call, we inspect
+  # the arguments of next call (since the first will be to `::`).
   if (rlang::is_call(defused_predicate, "::")) {
     predicate_args <- rlang::call_args(defused_predicate[[2]])
   }
 
   predicate_args <- rlang::call_args(defused_predicate)
   if (!any(vapply(predicate_args, identical, logical(1L), y = sym("x")))) {
-    # TODO: Fix the bad message when there are 0 arguments to the call!
     n_args <- length(predicate_args)
-    if (n_args > 5) {
+    error_msg <- "{.arg predicate} is a function call with {n_args} argument{?s}:"
+    if (n_args == 0) {
+      error_msg <- "{.arg predicate} is a function call with 0 arguments."
+      bullets <- NULL
+    } else if (n_args > 5) {
       args <- predicate_args[1:5]
       bullets <- c(
         rlang::set_names(paste(names(args), " = ", args), nm = "*"),
@@ -151,8 +131,8 @@ evalidate_predicate <- function(defused_predicate, error_call = rlang::caller_en
     )
     specifyr_error(
       c(
-        "{.arg predicate} must be a function or a call with an argument equal to {.arg x}.",
-        x = "{.arg predicate} is a function call with {n_args} argument{?s}:",
+        "{.arg predicate} must be a function or a call with some argument equal to {.arg x}.",
+        x = error_msg,
         rlang::set_names(bullets, nm = "*"),
         example
       ),
