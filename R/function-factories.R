@@ -64,7 +64,7 @@ cls_test_body <- function(x, target_cls, negate = FALSE) {
   call <- switch(
     target_cls_type_single(target_cls),
     # Ex. `is.numeric(c(1, 2, 3))`
-    recognized = rlang::call2(sym(cls_test_fn_name(target_cls)), x),
+    recognized = rlang::call2(cls_test_fn_name(target_cls), x),
     # Ex. `inherits(tibble(), "tbl")`
     string = rlang::expr(inherits(!!x, !!target_cls)),
     # Ex. `inherits_all(tibble(), c("tbl", "data.frame"))`
@@ -173,8 +173,21 @@ emit_cls_error <- function(
     x_index,
     error_call,
     error_class,
-    cls
+    cls,
+    caller = NULL
   ) {
+
+  # TODO: Implement this in all of the `emit_*_error` functions. Make sure that
+  # the `emit_*_error_multi` functions also pass their caller in. Probably change
+  # this into a function, since it will be used everywhere. Maybe this is actually
+  # the definition of `register_error_spec`.
+  caller <- caller %||% rlang::caller_fn()
+  if (is_object_spec(caller)) {
+    register_error_spec(caller)
+    error_spec_msg <- "Run {.run specifyr::error_spec()} for details on {.arg {x_name}}."
+  } else {
+    error_spec_msg <- NULL
+  }
 
   indexed_name <- paste0(x_name, format_index(x_index))
   expected_class <- if (target_cls_type_single(cls) == "list") {
@@ -186,7 +199,8 @@ emit_cls_error <- function(
   cli::cli_abort(
     c(
       paste0("{.arg {indexed_name}} must be class ", expected_class, "."),
-      x = "{.arg {indexed_name}} is class {.cls {class(x)}}."
+      x = "{.arg {indexed_name}} is class {.cls {class(x)}}.",
+      error_spec_msg
     ),
     call = error_call,
     class = error_class,
@@ -204,6 +218,7 @@ emit_cls_error_multi <- function(
     error_class,
     cls
   ) {
+
   # We need to re-test the classes of `x`'s elements. Re-generating the class
   # check functions using `cls_test_body` ensures that we get the same results
   # which caused the original class error.
@@ -225,7 +240,8 @@ emit_cls_error_multi <- function(
     x_index = error_index,
     error_call = error_call,
     error_class = error_class,
-    cls = cls[[error_at]]
+    cls = cls[[error_at]],
+    caller = rlang::caller_fn()
   )
 }
 

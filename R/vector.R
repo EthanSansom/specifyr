@@ -3,7 +3,20 @@
 # TODO:
 # I think the most useful thing would be to give users the ability to generate
 # *just* the specification function, without the blueprint. That way, they can
-# opt out of the `last_spec` messaging behaviour and have a lightweight function.
+# opt out of the `last_spec` messaging behavior and have a lightweight function.
+
+# TODO Ethan:
+# - make some special cases for certain combinations of vector spec inputs
+# Ex. `vector_spec("logical", len = 1, nas = FALSE)` produces checks with a
+# special error message regarding a boolean value.
+#
+# Error:
+# ! `x` must be a single `TRUE` or `FALSE` value.
+# x `x` is NA.
+#
+# Same for `is_string` and `is_count`.
+#
+# TODO ACUALLY! Just make some pre-built specs for bool, count, string...
 
 # TODO: Requires a *lot* of error checking for bad inputs.
 vector_spec <- function(
@@ -14,7 +27,6 @@ vector_spec <- function(
     missing = FALSE,
     spec_env = rlang::caller_env(),
     spec_checks = list(),
-    spec_checks_at = c("after", "before"),
     spec_return = rlang::sym("x"),
     spec_null_return = spec_return,
     spec_missing_return = spec_return,
@@ -33,7 +45,6 @@ new_spec <- function(blueprint, ...) {
 new_spec.vector_blueprint <- function(
     blueprint,
     spec_env = rlang::caller_env(),
-    spec_checks_at = c("after", "before"),
     spec_return = rlang::sym("x"),
     spec_null_return = spec_return,
     spec_missing_return = spec_return,
@@ -54,9 +65,6 @@ new_vector_blueprint <- function(cls, len, nas, null, missing, check_blueprints)
   )
 }
 
-# TODO:
-# - implement `check`, `check_must`, and friends
-# - add the `spec_checks`
 vector_check_fn <- function(
     cls,
     len = NULL,
@@ -65,7 +73,6 @@ vector_check_fn <- function(
     missing = FALSE,
     spec_env = rlang::caller_env(),
     spec_checks = list(),
-    spec_checks_at = c("after", "before"),
     spec_return = rlang::sym("x"),
     spec_null_return = spec_return,
     spec_missing_return = spec_return,
@@ -86,17 +93,31 @@ vector_check_fn <- function(
   len_check <- if (!is.null(len)) len_check_body(x, error_index, target_len = len)
   nas_check <- if (!nas) nas_check_body(x, error_index, target_len = len)
 
+  spec_checks <- lapply(
+    spec_checks,
+    \(check) {
+      bp <- blueprint(check)
+      predicate_check_body(
+        x = x,
+        error_index = list(),
+        predicate = bp$predicate,
+        message = bp$message
+      )
+    }
+  )
+
   body <- expr_squash(
     missing_return,
     null_return,
     cls_check,
     len_check,
     nas_check,
+    !!!spec_checks,
     spec_return
   )
 
-  new_function(
-    args = pairlist2(
+  rlang::new_function(
+    args = rlang::pairlist2(
       x = ,
       x_name = quote(rlang::caller_arg(x)),
       error_call = quote(rlang::caller_env()),
@@ -106,3 +127,46 @@ vector_check_fn <- function(
     env = spec_env
   )
 }
+
+# INTERACTIVE TESTS ------------------------------------------------------------
+
+if (FALSE) {
+  rm(list = ls())
+  load_all()
+
+  # Test inserting checks into vector specifications
+  above_10 <- check(~ isTRUE(x > 10), "{.arg {x_name}} must be greater than 10.")
+  big_integer <- vector_check_fn(cls = "integer", len = 1, spec_checks = list(above_10))
+
+  big_integer(20L)
+  big_integer(1L)
+  big_integer(c(100L, 200L))
+  big_integer(NA_integer_)
+
+  below_100 <- check(~isTRUE(x < 100), "{.arg {x_name}} must be less than 1000.")
+  medium_integer <- vector_check_fn(
+    cls = "integer",
+    len = 1,
+    spec_checks = list(above_10, below_100)
+  )
+
+  medium_integer(20L)
+  medium_integer(1000L)
+
+  base_medium_integer <- function(x) {
+    if (!is.integer(x)) stop("`x` must be an integer.")
+    if (!isTRUE(x > 10)) stop("`x` must be greater than 10.")
+    if (!isTRUE(x < 1000)) stop("`x` must be less than 1000.")
+    x
+  }
+
+  bench::mark(
+    medium_integer(20L),
+    base_medium_integer(20L)
+  )
+
+  object.size(medium_integer)
+  object.size(base_medium_integer)
+}
+
+

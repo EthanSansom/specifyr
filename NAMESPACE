@@ -2,5 +2,12 @@
 
 export(emit_cls_error)
 export(emit_cls_error_multi)
+export(emit_len_error)
+export(emit_len_error_multi)
+export(emit_nas_error)
+export(emit_nas_error_multi)
+export(emit_predicate_error)
+export(emit_predicate_error_multi)
+export(new_spec)
 importFrom(rlang,"%||%")
 importFrom(rlang,is_empty)
