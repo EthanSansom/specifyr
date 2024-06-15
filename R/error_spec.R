@@ -1,20 +1,20 @@
 the <- rlang::new_environment(
   list(
-    error_spec = NULL
+    spec_error = NULL
   )
 )
 
-register_error_spec <- function(spec) {
-  if (!is_obj_spec(spec)) {
-    cli::cli_abort("{.arg spec} must be a {.cls specifyr_obj_spec}.", .internal = TRUE)
-  }
-  class(spec) <- c("error_spec", class(spec))
-  the$error_spec <- spec
+register_spec_error <- function(spec) {
+  specifyr_internal_error(spec, "is_object_spec")
+  class(spec) <- c("specifyr_error_spec", class(spec))
+  the$spec_error <- spec
 }
 
-error_spec <- function() {
-  the$error_spec
+# TODO: This should have a `...` argument that allows you to pluck INTO the
+# specification at the supplied index.
+#
+#' @export
+spec_error <- function(...) {
+  # spec_pluck(the$spec_error, ...)
+  the$spec_error
 }
-
-# TODO Ethan: Given the naming conventions of everything else, having an `error_spec`
-# might be confusing (since we'll also have `condition_spec` / `cnd_spec`). Maybe `fail_spec`?

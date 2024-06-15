@@ -50,10 +50,6 @@ check <- function(
   )
 }
 
-is_check <- function(x) {
-  inherits(x, "specifyr_check")
-}
-
 check_must <- function(
     predicate,
     must,
@@ -143,7 +139,7 @@ new_check_fn <- function(
     )
   }
   specifyr_internal_error(check_return, "is_expression", "rlang")
-  specifyr_internal_error(check_env, "is.environment")
+  specifyr_internal_error(check_env, "is.environment", "base")
 
   args <- rlang::pairlist2(
     x = ,
@@ -183,7 +179,7 @@ new_check_blueprint <- function(
       .internal = TRUE
     )
   }
-  specifyr_internal_error(description, "is.character")
+  specifyr_internal_error(description, "is.character", "base")
   specifyr_internal_error(check_return, "is_expression", "rlang")
 
   structure(
@@ -198,10 +194,9 @@ new_check_blueprint <- function(
 }
 
 # TODO: Fix these internal errors
-as_check <- function(blueprint, check_env) {
-  stopifnot(inherits(blueprint, "specifyr_check_blueprint"))
-  stopifnot(is.environment(check_env))
-
+blueprint_to_check <- function(blueprint, check_env) {
+  specifyr_internal_error(check, "is_check_blueprint")
+  specifyr_internal_error(check_env, "is.environment", "base")
   new_check_fn(
     predicate = blueprint$predicate,
     message = blueprint$message,
@@ -210,12 +205,16 @@ as_check <- function(blueprint, check_env) {
   )
 }
 
-as_check_body <- function(check) {
-  blueprint <- blueprint(check)
+blueprint_to_check_body <- function(blueprint) {
+  specifyr_internal_error(check, "is_check_blueprint")
   predicate_check_body(
     predicate = blueprint$predicate,
     message = blueprint$message
   )
+}
+
+is_check_blueprint <- function(x) {
+  inherits(x, "specifyr_check_blueprint")
 }
 
 evalidate_predicate <- function(predicate_quo, error_call = rlang::caller_env()) {
@@ -382,6 +381,10 @@ evalidate_check_return <- function(check_return_expr) {
 
 # helpers ----------------------------------------------------------------------
 
+is_check <- function(x) {
+  inherits(x, "specifyr_check")
+}
+
 # TODO: Implement. Used to add checks to a specification. You'll need to re-create
 # the specification from it's blueprint.
 add_checks <- function(spec, ...) {
@@ -524,7 +527,7 @@ predicate_test_body <- function(x, predicate, negate = FALSE) {
 
 predicate_test_body_multi <- function(x, predicate, negate = FALSE) {
 
-  specifyr_internal_error(x, "is.symbol")
+  specifyr_internal_error(x, "is.symbol", "base")
 
   predicate_test <- rlang::expr(\(x) !!predicate)
   if (negate) {
@@ -623,9 +626,9 @@ if (FALSE) {
   # Test 0 arguments error
   check(checkmate::qassert(), "")
 
-  # Test `as_check`
-  as_check(blueprint(check(\(x) isTRUE(x + 1), "a message")), check_env = rlang::current_env())
-  as_check(blueprint(check(~ isTRUE(x + 1), "a message")), check_env = rlang::current_env())
+  # Test `blueprint_to_check`
+  blueprint_to_check(blueprint(check(\(x) isTRUE(x + 1), "a message")), check_env = rlang::current_env())
+  blueprint_to_check(blueprint(check(~ isTRUE(x + 1), "a message")), check_env = rlang::current_env())
 
   # `check_must` and `check_must_not`
   is_numeric <- check_must(~is.numeric(x), "be a {.cls numeric} vector")

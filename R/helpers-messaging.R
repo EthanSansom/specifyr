@@ -1,46 +1,123 @@
-commas <- function(x) {
-  paste(x, collapse = ", ")
-}
+# friendly ---------------------------------------------------------------------
 
-oxford <- function(x, sep = ", ", sep2 = " and ", last = sep2) {
-  x_len <- length(x)
-  if (x_len <= 2) {
-    paste(x, collapse = sep2)
+at_loc_friendly <- function(loc, n_max = 5) {
+  loc <- if (is.logical(loc)) which(loc & !is.na(loc)) else loc
+  loc <- as.numeric(loc)
+  n <- length(loc)
+  at <- ngettext(min(n, n_max), "at location ", "at locations ")
+  if (n > n_max) {
+    paste0(at, "`", deparse(loc[seq(n_max)]), "` and ", n - n_max, " more")
   } else {
-    paste0(paste(x[-x_len], collapse = sep), sep, last, x[[x_len]])
+    paste0(at, "`", deparse(loc), "`")
   }
 }
 
-numbered <- function(x, from = 1) {
-  x_length <- length(x)
-  if (x_length <= 0) {
-    return("")
-  }
-  numbers <- paste0(seq(from, from + x_length - 1), ".")
-  numbers <- style_subtle(formatC(numbers, width = max(nchar(numbers))))
-  paste(numbers, x)
-}
-
-at_locations <- function(locations, n_max = 5) {
-  if (is.logical(locations)) {
-    locations <- as.numeric(which(vapply(locations, isTRUE, logical(1L))))
-  }
-  specifyr_internal_error(locations, "is_integerish", "rlang")
-  n_locations <- length(locations)
-  prefix <- if (min(n_locations, n_max) == 1) "at location " else "at locations "
-  if (n_locations > n_max) {
-    at <- deparse(locations[seq(n_max)])
-    paste0(prefix, "`", at, "` and ", n_locations - n_max, " more")
+# TODO: Revise this to include a `min_len` and `max_len` argument.
+a_length_n_friendly <- function(len) {
+  if (is.null(len)) {
+    "a"
+  } else if (length(len) == 2) {
+    len <- format_len(len)
+    paste0("a length [", len[[1]], "-", len[[2]], "]")
+  } else if (len == 1) {
+    "a scalar"
+  } else if (len > 0) {
+    paste("a length", format_len(len))
   } else {
-    paste0(prefix, "`", deparse(locations), "`")
+    "an empty"
   }
 }
 
-format_index <- function(index) {
-  specifyr_internal_error(index, "is.list")
-  if (is_empty(index)) {
+# TODO: Revise this to include a `min_len` and `max_len` argument.
+length_n_friendly <- function(len) {
+  if (is.null(len)) {
     ""
+  } else if (length(len) == 2) {
+    len <- format_len(len)
+    paste0("length [", len[[1]], "-", len[[2]], "]")
+  } else if (len == 1) {
+    "length 1"
+  } else if (len > 0) {
+    paste("length", format_len(len))
   } else {
-    paste(paste0("[[", purrr::map_chr(index, deparse), "]]"), collapse = "")
+    "empty"
   }
+}
+
+format_len <- function(x) format(x, scientific = FALSE, big.mark = ",")
+
+in_range_friendly <- function(lower, upper) {
+  no_lower <- is.null(lower) || is.infinite(lower)
+  no_upper <- is.null(upper) || is.infinite(upper)
+  if (no_lower && no_upper) {
+    ""
+  } else if (no_lower) {
+    paste("equal to or less than", upper)
+  } else if (no_upper) {
+    paste("equal to or greater than", lower)
+  } else {
+    paste0("in range [", lower, ", ", upper, "]")
+  }
+}
+
+a_vector_friendly <- function(
+    type_desc,
+    len = NULL,
+    nas = TRUE,
+    null = FALSE,
+    min_len = NULL,
+    max_len = NULL,
+    upper = NULL,
+    lower = NULL,
+    finite = FALSE
+  ) {
+
+  null_or <- if (isTRUE(null)) "`NULL` or" else ""
+  a_len_n <- a_length_n_friendly(len %||% c(min_len, max_len))
+  non_na <- if (isFALSE(nas)) "non-NA" else ""
+  finite <- if (isTRUE(finite)) "finite" else ""
+  in_range <- in_range_friendly(lower, upper)
+
+  # Allows `type_desc` to use the correct article (i.e. "an integer", not "a integer")
+  if (length(type_desc) == 1) type_desc <- c("a", type_desc)
+  if (a_len_n == "a" && non_na == "" && finite == "") {
+    a_len_n <- type_desc[[1]]
+    type_desc <- type_desc[[2]]
+  } else {
+    type_desc <- type_desc[[2]]
+  }
+
+  cli::format_inline(
+    paste(null_or, a_len_n, non_na, finite, type_desc, in_range),
+    keep_whitespace = FALSE
+  )
+}
+
+# misc -------------------------------------------------------------------------
+
+upper1 <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
+
+commas <- function(x, n = NULL) {
+  if (!is.null(n) && length(x) > n) {
+    length(x) <- n
+    paste0(paste(x, collapse = ", "), ", ...")
+  } else {
+    paste(x, collapse = ", ")
+  }
+}
+
+oxford <- function(x, sep = ", ", last = "or", n = NULL) {
+  x_len <- length(x)
+  if (x_len <= 1) {
+    return(paste(x))
+  }
+  if (!is.null(n) && x_len > n) {
+    length(x) <- n
+    paste0(paste(x, collapse = sep), sep, " ...")
+  }
+  if (x_len == 2) sep <- " "
+  paste(paste(x[-x_len], collapse = sep), last, x[[x_len]], sep = sep)
 }

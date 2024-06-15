@@ -11,7 +11,7 @@ LazyData: true
 Imports: 
     cli,
     purrr,
-    rlang,
+    rlang (>= 1.1.0),
     vctrs
 URL: https://github.com/EthanSansom/specifyr
 BugReports: https://github.com/EthanSansom/specifyr/issues

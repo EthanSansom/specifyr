@@ -17,8 +17,8 @@
 
 cls_check_body <- function(x, error_index, target_cls) {
 
-  specifyr_internal_error(x, "is.symbol")
-  specifyr_internal_error(error_index, "is.list")
+  specifyr_internal_error(x, "is.symbol", "base")
+  specifyr_internal_error(error_index, "is.list", "base")
 
   rlang::expr(
     if (!!cls_test_body(x, target_cls, negate = TRUE)) {
@@ -36,9 +36,9 @@ cls_check_body <- function(x, error_index, target_cls) {
 
 cls_check_body_multi <- function(x, x_indices, error_index, target_cls) {
 
-  specifyr_internal_error(x, "is.symbol")
-  specifyr_internal_error(x_indices, "is.integer")
-  specifyr_internal_error(error_index, "is.list")
+  specifyr_internal_error(x, "is.symbol", "base")
+  specifyr_internal_error(x_indices, "is.integer", "base")
+  specifyr_internal_error(error_index, "is.list", "base")
 
   # If indices are provided, we want to check the object `x` only at the
   # specified `x_indices`.
@@ -183,8 +183,8 @@ emit_cls_error <- function(
   # the definition of `register_error_spec`.
   caller <- caller %||% rlang::caller_fn()
   if (is_object_spec(caller)) {
-    register_error_spec(caller)
-    error_spec_msg <- "Run {.run specifyr::error_spec()} for details on {.arg {x_name}}."
+    register_spec_error(caller)
+    error_spec_msg <- cli::col_grey("Run `{.run specifyr::spec_error()}` for details on {.arg {x_name}}.")
   } else {
     error_spec_msg <- NULL
   }
@@ -284,8 +284,8 @@ if (FALSE) {
 
 len_check_body <- function(x, error_index, target_len) {
 
-  specifyr_internal_error(x, "is.symbol")
-  specifyr_internal_error(error_index, "is.list")
+  specifyr_internal_error(x, "is.symbol", "base")
+  specifyr_internal_error(error_index, "is.list", "base")
 
   rlang::expr(
     if (!!len_test_body(x, target_len, negate = TRUE)) {
@@ -303,9 +303,9 @@ len_check_body <- function(x, error_index, target_len) {
 
 len_check_body_multi <- function(x, x_indices, error_index, target_len) {
 
-  specifyr_internal_error(x, "is.symbol")
-  specifyr_internal_error(x_indices, "is.integer")
-  specifyr_internal_error(error_index, "is.list")
+  specifyr_internal_error(x, "is.symbol", "base")
+  specifyr_internal_error(x_indices, "is.integer", "base")
+  specifyr_internal_error(error_index, "is.list", "base")
 
   # If indices are provided, we want to check the object `x` only at the specified `x_indices`.
   if (!rlang::is_empty(x_indices)) {
@@ -349,7 +349,7 @@ len_test_body <- function(x, target_len, negate = FALSE) {
           # If `max_len` is Inf, only check lower bound
           rlang::expr(length(!!x) < !!min_len)
         } else {
-          rlang::expr(not_between1(!!length(x), !!min_len, !!max_len))
+          rlang::expr(specifyr::not_between1(!!length(x), !!min_len, !!max_len))
         }
       } else {
         if (min_len == 0) {
@@ -359,7 +359,7 @@ len_test_body <- function(x, target_len, negate = FALSE) {
           # If `max_len` is Inf, only check lower bound
           rlang::expr(length(!!x) >= !!min_len)
         } else {
-          rlang::expr(between1(length(!!x), !!min_len, !!max_len))
+          rlang::expr(specifyr::between1(length(!!x), !!min_len, !!max_len))
         }
       }
     },
@@ -381,7 +381,7 @@ len_test_body_multi <- function(x, target_lens, negate = FALSE) {
       rlang::expr(all(!!x_lens == !!target_lens))
     },
 
-    # Ex. `all(mapply(between, x, left, right))`
+    # Ex. `all(mapply(specifyr::between, x, left, right))`
     range = {
       # These could contain `Inf` or `-Inf`, so result is potentially numeric
       min_lens <- vapply(target_lens, \(x) x[[1]], numeric(1L))
@@ -394,7 +394,7 @@ len_test_body_multi <- function(x, target_lens, negate = FALSE) {
           # If all `max_len` is Inf, only check lower bound
           rlang::expr(any(!!x_lens < !!min_lens))
         } else {
-          rlang::expr(any(not_between(!!x_lens, !!min_lens, !!max_lens)))
+          rlang::expr(any(specifyr::not_between(!!x_lens, !!min_lens, !!max_lens)))
         }
       } else {
         if (all(min_lens == 0)) {
@@ -404,7 +404,7 @@ len_test_body_multi <- function(x, target_lens, negate = FALSE) {
           # If all `max_len` is Inf, only check lower bound
           rlang::expr(all(!!x_lens >= !!min_lens))
         } else {
-          rlang::expr(all(between(!!x_lens, !!min_lens, !!max_lens)))
+          rlang::expr(all(specifyr::between(!!x_lens, !!min_lens, !!max_lens)))
         }
       }
     }
@@ -627,8 +627,8 @@ if (FALSE) {
 # on length 1 inputs and handle 0 length cases.
 nas_check_body <- function(x, error_index, target_len = NULL) {
 
-  specifyr_internal_error(x, "is.symbol")
-  specifyr_internal_error(error_index, "is.list")
+  specifyr_internal_error(x, "is.symbol", "base")
+  specifyr_internal_error(error_index, "is.list", "base")
 
   rlang::expr(
     if (!!nas_test_body(x, target_len, negate = FALSE)) {
@@ -645,9 +645,9 @@ nas_check_body <- function(x, error_index, target_len = NULL) {
 
 nas_check_body_multi <- function(x, x_indices, error_index, target_lens = NULL) {
 
-  specifyr_internal_error(x, "is.symbol")
-  specifyr_internal_error(x_indices, "is.integer")
-  specifyr_internal_error(error_index, "is.list")
+  specifyr_internal_error(x, "is.symbol", "base")
+  specifyr_internal_error(x_indices, "is.integer", "base")
+  specifyr_internal_error(error_index, "is.list", "base")
 
   # If indices are provided, we want to check the object `x` only at the specified `x_indices`.
   if (!rlang::is_empty(x_indices)) {
@@ -890,8 +890,8 @@ if (FALSE) {
 
 # null -------------------------------------------------------------------------
 
-null_return_body <- function(x, spec_null_return = NULL) {
-  specifyr_internal_error(x, "is.symbol")
+null_return_body <- function(x, spec_null_return) {
+  specifyr_internal_error(x, "is.symbol", "base")
   rlang::expr(
     if (!!null_test_body(x, negate = FALSE)) {
       return(!!spec_null_return)
@@ -919,8 +919,8 @@ if (FALSE) {
 
 # missing ----------------------------------------------------------------------
 
-missing_return_body <- function(x, spec_missing_return = TRUE) {
-  specifyr_internal_error(x, "is.symbol")
+missing_return_body <- function(x, spec_missing_return) {
+  specifyr_internal_error(x, "is.symbol", "base")
   rlang::expr(
     if (!!missing_test_body(x, negate = FALSE)) {
       return(!!spec_missing_return)
@@ -955,23 +955,14 @@ if (FALSE) {
 # If no class is provided to `vector_spec`, we still want to check that the object
 # is vector-like.
 
-emit_vctr_error <- function(...) {
-  cli::cat_line("You caught a vector error!")
-}
-
-emit_vctr_error_multi <- function(...) {
-  cli::cat_line("You caught a multi-vector error!")
-}
-
 vctr_check_body <- function(x, error_index) {
 
-  specifyr_internal_error(x, "is.symbol")
-  specifyr_internal_error(error_index, "is.list")
+  specifyr_internal_error(x, "is.symbol", "base")
+  specifyr_internal_error(error_index, "is.list", "base")
 
   rlang::expr(
     if (!!vctr_test_body(x, negate = TRUE)) {
-      # TODO Ethan: Make sure to add namespace `specifyr::`!
-      emit_vctr_error(
+      specifyr::emit_vctr_error(
         x = !!x,
         x_name = x_name,
         x_index = !!error_index,
@@ -984,20 +975,14 @@ vctr_check_body <- function(x, error_index) {
 
 vctr_check_body_multi <- function(x, x_indices, error_index) {
 
-  specifyr_internal_error(x, "is.symbol")
-  specifyr_internal_error(x_indices, "is.integer")
-  specifyr_internal_error(error_index, "is.list")
+  specifyr_internal_error(x, "is.symbol", "base")
+  specifyr_internal_error(x_indices, "is.integer", "base")
+  specifyr_internal_error(error_index, "is.list", "base")
 
-  # If indices are provided, we want to check the object `x` only at the
-  # specified `x_indices`.
-  if (!rlang::is_empty(x_indices)) {
-    x <- rlang::call2("[", x, x_indices)
-  }
-
+  if (!is_empty(x_indices)) x <- rlang::call2("[", x, x_indices)
   rlang::expr(
     if (!!vctr_test_body_multi(x, negate = TRUE)) {
-      # TODO Ethan: Make sure to add namespace `specifyr::`!
-      emit_vctr_error_multi(
+      specifyr::emit_vctr_error_multi(
         x = !!x,
         x_name = x_name,
         x_index = !!error_index,
@@ -1010,9 +995,9 @@ vctr_check_body_multi <- function(x, x_indices, error_index) {
 
 vctr_test_body <- function(x, negate = FALSE) {
   if (negate) {
-    rlang::expr(is.data.frame(!!x) || is.list(!!x) || !vctrs::obj_is_vector(!!x))
+    rlang::expr(specifyr::is_not_vctr(!!x))
   } else {
-    rlang::expr(!is.data.frame(!!x) && !is.list(!!x) && vctrs::obj_is_vector(!!x))
+    rlang::expr(specifyr::is_vctr(!!x))
   }
 }
 
@@ -1021,15 +1006,41 @@ vctr_test_body_multi <- function(x, negate = FALSE) {
 
 }
 
+# TODO: Implement
+#' @export
+emit_vctr_error <- function(...) {
+  cli::cat_line("You caught a vector error!")
+}
+
+# TODO: Implement
+#' @export
+emit_vctr_error_multi <- function(...) {
+  cli::cat_line("You caught a multi-vector error!")
+}
+
 # utils ------------------------------------------------------------------------
 
 # These will need to be exported, so that the end user of the `*_spec` functions
 # can access them.
 
+#' @export
 between1 <- function(x, left, right) { left <= x && x <= right }
 
+#' @export
 between <- function(x, left, right) { left <= x & x <= right }
 
+#' @export
 not_between1 <- function(x, left, right) { x < left || right < x }
 
+#' @export
 not_between <- function(x, left, right) { x < left | right < x }
+
+#' @export
+is_not_vctr <- function(x) {
+  is.data.frame(x) || is.list(x) || !vctrs::obj_is_vector(x)
+}
+
+#' @export
+is_vctr <- function(x) {
+  !is.data.frame(x) && !is.list(x) && vctrs::obj_is_vector(x)
+}
