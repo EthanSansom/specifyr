@@ -1,10 +1,11 @@
-# stop -------------------------------------------------------------------------
+# stop mistyped ----------------------------------------------------------------
+
+#' @export
 stop_vector_mistyped <- function(
     x,
     x_name,
     type_desc,
     type_test,
-    x_must = NULL,
     len = NULL,
     nas = NULL,
     null = NULL,
@@ -13,23 +14,42 @@ stop_vector_mistyped <- function(
     lower = NULL,
     upper = NULL,
     finite = NULL,
+    x_must = NULL,
+    # To omit either the header or bullets, a user can supply `character(0L)`
+    error_header = NULL,
+    error_bullets = NULL,
     error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
+    error_class = "specifyr_error_mistyped",
+    # TODO: Maybe change `max_name_width` to be in terms of `cli::console_width`.
+    #       Think about what  the longest possible message would be.
+    max_name_width = 40,
+    name_replacement = "Argument"
 ) {
 
-  # This will also catch if `x` was NULL but shouldn't have been.
-  if (!(type_test)) {
-    stop_not_is_object(
+  # TODO: It's not clear where, or if, we should raise an error for invalid
+  #       arguments like `error_class`, `error_bullets`, etc. These won't
+  #       effect the type check, but can cause an error here. These errors
+  #       can only be realized when the type check is run, not when it is
+  #       called (i.e. `int("A", error_bullets = mean)` will error here).
+
+  if (isFALSE(null) && is.null(x) || !type_test) {
+    stop_not_type(
       x = x,
       x_name = x_name,
       x_must = x_must,
-      obj_desc = type_desc,
+      type_desc = type_desc,
       null = null,
+      error_header = error_header,
+      error_bullets = error_bullets,
       error_call = error_call,
-      error_class = error_class
+      error_class = error_class,
+      max_name_width = max_name_width,
+      name_replacement = name_replacement
     )
   }
 
+  # By default, a message like "be a length 1 integer vector". Used in the
+  # error message header if no `error_header` is supplied.
   if (is.null(x_must)) {
     x_must <- paste("be", a_vector_friendly(
         type_desc = type_desc,
@@ -43,8 +63,24 @@ stop_vector_mistyped <- function(
         finite = finite
     ))
   }
-  header <- paste0("{.arg {x_name}} must ", x_must, ".")
-  bullets <- vector_mistyped_bullets(
+
+  # By default, a message like "`x_name` must be a length 1 integer vector". If
+  # `x_name` is a long string, we refer to `x_name` using `name_replacement`.
+  name_too_long <- FALSE
+  if (!is.null(error_header)) {
+    header <- error_header
+  } else if (nchar(x_name) > max_name_width) {
+    object <- tolower(name_replacement)
+    header <- c(
+      paste0("Mistyped ", object, ": {.arg {x_name}}."),
+      i = paste0(upper1(object), " must ", x_must, ".")
+    )
+    name_too_long <- TRUE
+  } else {
+    header <- paste0("{.arg {x_name}} must ", x_must, ".")
+  }
+
+  bullets <- error_bullets %||% vector_mistyped_bullets(
     x = x,
     len = len,
     nas = nas,
@@ -52,7 +88,9 @@ stop_vector_mistyped <- function(
     max_len = max_len,
     lower = lower,
     upper = upper,
-    finite = finite
+    finite = finite,
+    name_too_long = name_too_long,
+    name_replacement = name_replacement
   )
 
   cli::cli_abort(
@@ -62,29 +100,50 @@ stop_vector_mistyped <- function(
   )
 }
 
-stop_not_is_object <- function(
+stop_not_type <- function(
     x,
     x_name,
-    obj_desc,
-    x_must = NULL,
+    type_desc,
     null = NULL,
+    x_must = NULL,
+    error_header = NULL,
+    error_bullets = NULL,
     error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
+    error_class = "specifyr_error_mistyped",
+    max_name_width = 40,
+    name_replacement = "Argument"
   ) {
+
   if (is.null(x_must)) {
     null_or <- if (isTRUE(null)) "`NULL` or " else ""
-    x_must <- paste0("be ", null_or, paste(obj_desc, collapse = " "))
+    x_must <- paste0("be ", null_or, paste(type_desc, collapse = " "))
   }
+
+  if (!is.null(error_header)) {
+    header <- error_header
+    object <- "{.arg {x_name}}"
+  } else if (nchar(x_name) > max_name_width) {
+    object <- upper1(name_replacement)
+    header <- c(
+      "Mistyped argument: {.arg {x_name}}.",
+      i = paste0(object, " must ", x_must, ".")
+    )
+  } else {
+    header <- paste0("{.arg {x_name}} must ", x_must, ".")
+    object <- "{.arg {x_name}}"
+  }
+
   cli::cli_abort(
     c(
-      paste0("{.arg {x_name}} must ", x_must, "."),
-      x = "{.arg {x_name}} is {.obj_type_friendly {x}}."
+      header,
+      error_bullets %||% c(x = paste(object, "is {.obj_type_friendly {x}}."))
     ),
     call = error_call,
     class = c(error_class, "specifyr_error")
   )
 }
 
+# TODO: Add the `{x_name}` too long stuff from `stop_vector_mistyped`
 stop_not_integerish <- function(
     x,
     x_name,
@@ -172,6 +231,20 @@ stop_arg_missing <- function(
   )
 }
 
+stop_wrong_names <- function(
+    x,
+    x_name,
+    nms,
+    strict = FALSE,
+    error_call = rlang::caller_env(),
+    error_class = "specifyr_error_mistyped"
+  ) {
+
+
+
+}
+
+
 vector_mistyped_bullets <- function(
     x,
     len = NULL,
@@ -180,32 +253,33 @@ vector_mistyped_bullets <- function(
     max_len = NULL,
     lower = NULL,
     upper = NULL,
-    finite = NULL
+    finite = NULL,
+    name_too_long = FALSE,
+    name_replacement = "Argument"
   ) {
+
+  object <- if (name_too_long) upper1(name_replacement) else "{.arg {x_name}}"
 
   x_len <- length(x)
   len_bullet <- if (isTRUE(x_len < (min_len %||% len) || (max_len %||% len) < x_len)) {
-    paste0("{.arg {x_name}} is ", length_n_friendly(x_len), ".")
+    paste0(object, " is ", length_n_friendly(x_len), ".")
   }
-
   x_nas <- is.na(x)
   nas_bullet <- if (isFALSE(nas) && any(x_nas)) {
-    paste0("{.arg {x_name}} is NA or NaN ", at_loc_friendly(x_nas), ".")
+    paste0(object, " is NA or NaN ", at_loc_friendly(x_nas), ".")
   }
-
   skip_min_max <- all(x_nas) || x_len == 0
   x_min <- if (!(skip_min_max || is.null(lower))) min(x, na.rm = TRUE)
   lower_bullet <- if (isTRUE(x_min < lower)) {
-    paste0("{.arg {x_name}} has a minimum of ", x_min, ".")
+    paste0(object, " has a minimum of ", x_min, ".")
   }
   x_max <- if (!(skip_min_max || is.null(upper))) max(x, na.rm = TRUE)
   upper_bullet <- if (isTRUE(upper < x_max)) {
-    paste0("{.arg {x_name}} has a maximum of ", x_max, ".")
+    paste0(object, " has a maximum of ", x_max, ".")
   }
-
   x_inf <- if (!is.null(finite)) is.infinite(x)
   finite_bullet <- if (isTRUE(finite) && any(x_inf)) {
-    paste0("{.arg {x_name}} is an infinite value ", at_location_friendly(x_inf), ".")
+    paste0(object, " is an infinite value ", at_loc_friendly(x_inf), ".")
   }
 
   c(
@@ -217,23 +291,7 @@ vector_mistyped_bullets <- function(
   )
 }
 
-test_type <- function(x, x_type) {
-  test_fn <- switch(
-    x_type,
-    integer = is.integer,
-    character = is.character,
-    numeric = is.numeric,
-    double = is.double,
-    logical = is.logical,
-    complex = is.complex,
-    raw = is.raw,
-    list = is.list,
-    any = \(x) TRUE
-  )
-  test_fn(x)
-}
-
-# check ------------------------------------------------------------------------
+# check package objects --------------------------------------------------------
 
 check_is_list_of_check <- function(
     x,
@@ -281,6 +339,59 @@ check_is_check <- function(
     error_class = error_class
   )
 }
+
+check_is_list_of_alias <- function(
+    x,
+    x_name = rlang::caller_arg(x),
+    error_call = rlang::caller_env(),
+    error_class = "specifyr_error_input"
+) {
+
+  if (!is.list(x)) {
+    alias <- check_is_alias(
+      x = x,
+      x_name = x_name,
+      error_call = error_call,
+      error_class = error_class
+    )
+    return(list(alias))
+  }
+  .mapply(
+    check_is_alias,
+    dots = list(
+      x = x,
+      x_name = paste0(x_name, "[[", seq_along(x), "]]")
+    ),
+    MoreArgs = list(
+      error_call = error_call,
+      error_class = error_class
+    )
+  )
+}
+
+check_is_alias <- function(
+    x,
+    x_name = rlang::caller_arg(x),
+    error_call = rlang::caller_env(),
+    error_class = "specifyr_error_input"
+) {
+  # `x` may be a quosure to allow recursive aliasers to receive the `..etc` symbol
+  if (rlang::is_quosure(x) && is_symbol(quo_get_expr(x), "..etc")) {
+    return(TRUE)
+  }
+  if (is_alias(rlang::eval_tidy(x))) {
+    return(x)
+  }
+  stop_not_is_object(
+    x = rlang::eval_tidy(x),
+    x_name = x_name,
+    obj_desc = c("a", "{.cls specifyr_type_alias}"),
+    error_call = error_call,
+    error_class = error_class
+  )
+}
+
+# check package arguments ------------------------------------------------------
 
 check_vector_type_args <- function(
     ...,
@@ -410,4 +521,147 @@ check_vector_type_arg_nms <- function(
     call = error_call,
     class = c(error_class, "specifyr_error")
   )
+}
+
+# internal error ---------------------------------------------------------------
+
+#' @export
+stop_malformed_alias <- function(error_call = rlang::caller_env()) {
+  cli::cli_abort(
+    c(
+      "{.cls specifyr_type_alias} is malformed.",
+      i = "Alias did not raise an error after a failed test."
+    ),
+    .internal = TRUE
+  )
+}
+
+#' @export
+stop_malformed_type_check <- function(error_call = rlang::caller_env()) {
+  cli::cli_abort(
+    c(
+      "{.cls specifyr_type_check} is malformed.",
+      i = "Type check did not raise an error after a failed test."
+    ),
+    .internal = TRUE
+  )
+}
+
+# messages ---------------------------------------------------------------------
+
+a_vector_friendly <- function(
+    type_desc,
+    len = NULL,
+    nas = TRUE,
+    null = FALSE,
+    min_len = NULL,
+    max_len = NULL,
+    upper = NULL,
+    lower = NULL,
+    finite = FALSE
+) {
+
+  null_or <- if (isTRUE(null)) "`NULL` or" else ""
+  a_len_n <- a_length_n_friendly(len %||% c(min_len, max_len))
+  non_na <- if (isFALSE(nas)) "non-NA" else ""
+  finite <- if (isTRUE(finite)) "finite" else ""
+  in_range <- in_range_friendly(lower, upper)
+
+  # Allows `type_desc` to use the correct article (i.e. "an integer", not "a integer")
+  if (length(type_desc) == 1) type_desc <- c("a", type_desc)
+  if (a_len_n == "a" && non_na == "" && finite == "") {
+    a_len_n <- type_desc[[1]]
+    type_desc <- type_desc[[2]]
+  } else {
+    type_desc <- type_desc[[2]]
+  }
+
+  cli::format_inline(
+    paste(null_or, a_len_n, non_na, finite, type_desc, in_range),
+    keep_whitespace = FALSE
+  )
+}
+
+at_loc_friendly <- function(loc, n_max = 5) {
+  loc <- if (is.logical(loc)) which(loc & !is.na(loc)) else loc
+  loc <- as.numeric(loc)
+  n <- length(loc)
+  at <- ngettext(min(n, n_max), "at location ", "at locations ")
+  if (n > n_max) {
+    paste0(at, "`", deparse(loc[seq(n_max)]), "` and ", n - n_max, " more")
+  } else {
+    paste0(at, "`", deparse(loc), "`")
+  }
+}
+
+# TODO: Revise this to include a `min_len` and `max_len` argument.
+a_length_n_friendly <- function(len) {
+  if (is.null(len)) {
+    "a"
+  } else if (length(len) == 2) {
+    len <- format_len(len)
+    paste0("a length [", len[[1]], "-", len[[2]], "]")
+  } else if (len == 1) {
+    "a scalar"
+  } else if (len > 0) {
+    paste0("a length", format_len(len))
+  } else {
+    "an empty"
+  }
+}
+
+# TODO: Revise this to include a `min_len` and `max_len` argument.
+length_n_friendly <- function(len) {
+  if (is.null(len)) {
+    ""
+  } else if (length(len) == 2) {
+    len <- format_len(len)
+    paste0("length [", len[[1]], "-", len[[2]], "]")
+  } else if (len > 0) {
+    paste0("length-", format_len(len))
+  } else {
+    "empty"
+  }
+}
+
+format_len <- function(x) format(x, scientific = FALSE, big.mark = ",")
+
+in_range_friendly <- function(lower, upper) {
+  no_lower <- is.null(lower) || is.infinite(lower)
+  no_upper <- is.null(upper) || is.infinite(upper)
+  if (no_lower && no_upper) {
+    ""
+  } else if (no_lower) {
+    paste("upper bounded by", upper)
+  } else if (no_upper) {
+    paste("lower bounded by", lower)
+  } else {
+    paste0("in range [", lower, ", ", upper, "]")
+  }
+}
+
+upper1 <- function(x) {
+  substr(x, 1, 1) <- toupper(substr(x, 1, 1))
+  x
+}
+
+commas <- function(x, n = NULL) {
+  if (isTRUE(length(x) > n)) {
+    length(x) <- n
+    paste0(paste(x, collapse = ", "), ", ...")
+  } else {
+    paste(x, collapse = ", ")
+  }
+}
+
+oxford <- function(x, sep = ", ", last = "or", n = NULL) {
+  x_len <- length(x)
+  if (x_len <= 1) {
+    return(paste(x))
+  } else if (!is.null(n) && x_len > n) {
+    length(x) <- n
+    return(paste0(paste(x, collapse = sep), sep, " ..."))
+  }
+  if (x_len == 2) sep <- " "
+  paste(paste(x[-x_len], collapse = sep), last, x[[x_len]], sep = sep)
 }
