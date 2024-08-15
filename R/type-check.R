@@ -29,1186 +29,253 @@ test_int <- new_builtin_type(
   upper = Inf
 )
 
-lst_of_int <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
+lst_of_int <- new_list_of_type(int)
 
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (lst_null && is.null(x)) {
-    return(x)
-  }
-  if (!checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = lst_null
-  )) {
-    stop_vector_mistyped(
-      x = x,
-      x_name = x_name,
-      type_desc = c("a", "list"),
-      type_test = is.list(x),
-      len = lst_len,
-      null = lst_null,
-      min_len = lst_min_len,
-      max_len = lst_max_len,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  .mapply(
-    FUN = int,
-    dots = list(
-      x = x,
-      x_name = sprintf("%s[[%i]]", x_name, seq_along(x))
-    ),
-    MoreArgs = list(
-      len = len,
-      nas = nas,
-      null = null,
-      min_len = min_len,
-      max_len = max_len,
-      lower = lower,
-      upper = upper,
-      error_call = error_call,
-      error_class = error_class
-    )
-  )
-}
-class(lst_of_int) <- c("specifyr_type_check", "function")
-
-test_lst_of_int <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
-
-  checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = lst_null
-  ) && all(vapply(
-    X = x,
-    FUN = test_int,
-    FUN.VALUE = logical(1L),
-    len = len,
-    nas = nas,
-    null = null,
-    min_len = min_len,
-    max_len = max_len,
-    lower = lower,
-    upper = upper
-  ))
-}
-class(test_lst_of_int) <- c("specifyr_type_test", "function")
+test_lst_of_int <- new_list_of_type(test_int)
 
 # num --------------------------------------------------------------------------
 
-num <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    finite = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
+num <- new_builtin_type(
+  type_class = "numeric",
+  type_desc = c("a", "{.cls numeric} vector"),
+  fun_is = "check",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL,
+  lower = -Inf,
+  upper = Inf
+)
 
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (checkmate::test_numeric(
-    x,
-    any.missing = nas,
-    len = len,
-    min.len = min_len,
-    max.len = max_len,
-    null.ok = null,
-    lower = lower,
-    upper = upper,
-    finite = finite
-  )) {
-    return(x)
-  }
-  stop_vector_mistyped(
-    x = x,
-    x_name = x_name,
-    type_desc = c("a", "{.cls numeric} vector"),
-    type_test = is.numeric(x),
-    len = len,
-    nas = nas,
-    null = null,
-    min_len = min_len,
-    max_len = max_len,
-    lower = lower,
-    upper = upper,
-    finite = finite,
-    error_call = error_call,
-    error_class = error_class
-  )
-}
-class(num) <- c("specifyr_type_check", "function")
+test_num <- new_builtin_type(
+  type_class = "numeric",
+  type_desc = c("a", "{.cls numeric} vector"),
+  fun_is = "test",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL,
+  lower = -Inf,
+  upper = Inf
+)
 
-test_num <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    finite = FALSE
-) {
-  checkmate::test_numeric(
-    x,
-    any.missing = nas,
-    len = len,
-    min.len = min_len,
-    max.len = max_len,
-    null.ok = null,
-    lower = lower,
-    upper = upper,
-    finite = finite
-  )
-}
-class(test_num) <- c("specifyr_type_test", "function")
+lst_of_num <- new_list_of_type(num)
 
-lst_of_num <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    finite = FALSE,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
-
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (lst_null && is.null(x)) {
-    return(x)
-  }
-  if (!checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = lst_null
-  )) {
-    stop_vector_mistyped(
-      x = x,
-      x_name = x_name,
-      type_desc = c("a", "list"),
-      type_test = is.list(x),
-      len = lst_len,
-      null = lst_null,
-      min_len = lst_min_len,
-      max_len = lst_max_len,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  .mapply(
-    FUN = num,
-    dots = list(
-      x = x,
-      x_name = sprintf("%s[[%i]]", x_name, seq_along(x))
-    ),
-    MoreArgs = list(
-      len = len,
-      nas = nas,
-      null = null,
-      min_len = min_len,
-      max_len = max_len,
-      lower = lower,
-      upper = upper,
-      finite = finite,
-      error_call = error_call,
-      error_class = error_class
-    )
-  )
-}
-class(lst_of_num) <- c("specifyr_type_check", "function")
-
-test_lst_of_num <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    finite = FALSE,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
-
-  checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = lst_null
-  ) && all(vapply(
-    X = x,
-    FUN = test_num,
-    FUN.VALUE = logical(1L),
-    len = len,
-    nas = nas,
-    null = null,
-    min_len = min_len,
-    max_len = max_len,
-    lower = lower,
-    upper = upper,
-    finite = finite
-  ))
-}
-class(test_lst_of_num) <- c("specifyr_type_test", "function")
+test_lst_of_num <- new_list_of_type(test_num)
 
 # dbl --------------------------------------------------------------------------
 
-dbl <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    finite = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
+dbl <- new_builtin_type(
+  type_class = "double",
+  type_desc = c("a", "{.cls double} vector"),
+  fun_is = "check",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL,
+  lower = -Inf,
+  upper = Inf
+)
 
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (checkmate::test_double(
-    x,
-    any.missing = nas,
-    len = len,
-    min.len = min_len,
-    max.len = max_len,
-    null.ok = null,
-    lower = lower,
-    upper = upper,
-    finite = finite
-  )) {
-    return(x)
-  }
-  stop_vector_mistyped(
-    x = x,
-    x_name = x_name,
-    type_desc = c("a", "{.cls double} vector"),
-    type_test = is.double(x),
-    len = len,
-    nas = nas,
-    null = null,
-    min_len = min_len,
-    max_len = max_len,
-    lower = lower,
-    upper = upper,
-    finite = finite,
-    error_call = error_call,
-    error_class = error_class
-  )
-}
-class(dbl) <- c("specifyr_type_check", "function")
+test_dbl <- new_builtin_type(
+  type_class = "double",
+  type_desc = c("a", "{.cls double} vector"),
+  fun_is = "test",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL,
+  lower = -Inf,
+  upper = Inf
+)
 
-test_dbl <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    finite = FALSE
-) {
-  checkmate::test_double(
-    x,
-    any.missing = nas,
-    len = len,
-    min.len = min_len,
-    max.len = max_len,
-    null.ok = null,
-    lower = lower,
-    upper = upper,
-    finite = finite
-  )
-}
-class(test_dbl) <- c("specifyr_type_test", "function")
+lst_of_dbl <- new_list_of_type(dbl)
 
-lst_of_dbl <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    finite = FALSE,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
-
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (lst_null && is.null(x)) {
-    return(x)
-  }
-  if (!checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = lst_null
-  )) {
-    stop_vector_mistyped(
-      x = x,
-      x_name = x_name,
-      type_desc = c("a", "list"),
-      type_test = is.list(x),
-      len = lst_len,
-      null = lst_null,
-      min_len = lst_min_len,
-      max_len = lst_max_len,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  .mapply(
-    FUN = dbl,
-    dots = list(
-      x = x,
-      x_name = sprintf("%s[[%i]]", x_name, seq_along(x))
-    ),
-    MoreArgs = list(
-      len = len,
-      nas = nas,
-      null = null,
-      min_len = min_len,
-      max_len = max_len,
-      lower = lower,
-      upper = upper,
-      finite = finite,
-      error_call = error_call,
-      error_class = error_class
-    )
-  )
-}
-class(lst_of_dbl) <- c("specifyr_type_check", "function")
-
-test_lst_of_dbl <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    finite = FALSE,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
-
-  checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = lst_null
-  ) && all(vapply(
-    X = x,
-    FUN = test_dbl,
-    FUN.VALUE = logical(1L),
-    len = len,
-    nas = nas,
-    null = null,
-    min_len = min_len,
-    max_len = max_len,
-    lower = lower,
-    upper = upper,
-    finite = finite
-  ))
-}
-class(test_lst_of_dbl) <- c("specifyr_type_test", "function")
+test_lst_of_dbl <- new_list_of_type(test_dbl)
 
 # cpl --------------------------------------------------------------------------
 
-cpl <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
+cpl <- new_builtin_type(
+  type_class = "complex",
+  type_desc = c("a", "{.cls complex} vector"),
+  fun_is = "check",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL
+)
 
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (checkmate::test_complex(
-    x,
-    any.missing = nas,
-    len = len,
-    min.len = min_len,
-    max.len = max_len,
-    null.ok = null
-  )) {
-    return(x)
-  }
-  stop_vector_mistyped(
-    x = x,
-    x_name = x_name,
-    type_desc = c("a", "{.cls complex} vector"),
-    type_test = is.complex(x),
-    len = len,
-    nas = nas,
-    null = null,
-    min_len = min_len,
-    max_len = max_len,
-    error_call = error_call,
-    error_class = error_class
-  )
-}
-class(cpl) <- c("specifyr_type_check", "function")
+test_cpl <- new_builtin_type(
+  type_class = "complex",
+  type_desc = c("a", "{.cls complex} vector"),
+  fun_is = "test",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL
+)
 
-test_cpl <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf
-) {
-  checkmate::test_complex(
-    x,
-    any.missing = nas,
-    len = len,
-    min.len = min_len,
-    max.len = max_len,
-    null.ok = null
-  )
-}
-class(test_cpl) <- c("specifyr_type_test", "function")
+lst_of_cpl <- new_list_of_type(cpl)
 
-lst_of_cpl <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
-
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (lst_null && is.null(x)) {
-    return(x)
-  }
-  if (!checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = lst_null
-  )) {
-    stop_vector_mistyped(
-      x = x,
-      x_name = x_name,
-      type_desc = c("a", "list"),
-      type_test = is.list(x),
-      len = lst_len,
-      null = lst_null,
-      min_len = lst_min_len,
-      max_len = lst_max_len,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  .mapply(
-    FUN = cpl,
-    dots = list(
-      x = x,
-      x_name = sprintf("%s[[%i]]", x_name, seq_along(x))
-    ),
-    MoreArgs = list(
-      len = len,
-      nas = nas,
-      null = null,
-      min_len = min_len,
-      max_len = max_len,
-      error_call = error_call,
-      error_class = error_class
-    )
-  )
-}
-class(lst_of_cpl) <- c("specifyr_type_check", "function")
-
-test_lst_of_cpl <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
-
-  checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = lst_null
-  ) && all(vapply(
-    X = x,
-    FUN = test_cpl,
-    FUN.VALUE = logical(1L),
-    len = len,
-    nas = nas,
-    null = null,
-    min_len = min_len,
-    max_len = max_len
-  ))
-}
-class(test_lst_of_cpl) <- c("specifyr_type_test", "function")
+test_lst_of_cpl <- new_list_of_type(test_cpl)
 
 # lgl --------------------------------------------------------------------------
 
-lgl <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
+lgl <- new_builtin_type(
+  type_class = "logical",
+  type_desc = c("a", "{.cls logical} vector"),
+  fun_is = "check",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL
+)
 
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (checkmate::test_logical(
-    x,
-    any.missing = nas,
-    len = len,
-    min.len = min_len,
-    max.len = max_len,
-    null.ok = null
-  )) {
-    return(x)
-  }
-  stop_vector_mistyped(
-    x = x,
-    x_name = x_name,
-    type_desc = c("a", "{.cls logical} vector"),
-    type_test = is.logical(x),
-    len = len,
-    nas = nas,
-    null = null,
-    min_len = min_len,
-    max_len = max_len,
-    error_call = error_call,
-    error_class = error_class
-  )
-}
-class(lgl) <- c("specifyr_type_check", "function")
+test_lgl <- new_builtin_type(
+  type_class = "logical",
+  type_desc = c("a", "{.cls logical} vector"),
+  fun_is = "test",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL
+)
 
-test_lgl <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf
-) {
-  checkmate::test_logical(
-    x,
-    any.missing = nas,
-    len = len,
-    min.len = min_len,
-    max.len = max_len,
-    null.ok = null
-  )
-}
-class(test_lgl) <- c("specifyr_type_test", "function")
+lst_of_lgl <- new_list_of_type(lgl)
 
-lst_of_lgl <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
+test_lst_of_lgl <- new_list_of_type(test_lgl)
 
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (null && is.null(x)) {
-    return(x)
-  }
-  if (!checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = null
-  )) {
-    stop_vector_mistyped(
-      x = x,
-      x_name = x_name,
-      type_desc = c("a", "list"),
-      type_test = is.list(x),
-      len = lst_len,
-      null = null,
-      min_len = lst_min_len,
-      max_len = lst_max_len,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  .mapply(
-    FUN = lgl,
-    dots = list(
-      x = x,
-      x_name = sprintf("%s[[%i]]", x_name, seq_along(x))
-    ),
-    MoreArgs = list(
-      len = len,
-      nas = nas,
-      null = null,
-      min_len = min_len,
-      max_len = max_len,
-      error_call = error_call,
-      error_class = error_class
-    )
-  )
-}
-class(lst_of_lgl) <- c("specifyr_type_check", "function")
-
-test_lst_of_lgl <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
-
-  checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = null
-  ) && all(vapply(
-    X = x,
-    FUN = test_lgl,
-    FUN.VALUE = logical(1L),
-    len = len,
-    nas = nas,
-    null = null,
-    min_len = min_len,
-    max_len = max_len
-  ))
-}
-class(test_lst_of_lgl) <- c("specifyr_type_test", "function")
+# TODO: Keep adding below here
 
 # chr --------------------------------------------------------------------------
 
-chr <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    # TODO: Maybe add some more of the character arguments! `checkmate` has a bunch,
-    #       that might be worthwhile (and easy) to throw in.
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
+chr <- new_builtin_type(
+  type_class = "character",
+  type_desc = c("a", "{.cls character} vector"),
+  fun_is = "check",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL
+)
 
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (checkmate::test_character(
-    x,
-    any.missing = nas,
-    len = len,
-    min.len = min_len,
-    max.len = max_len,
-    null.ok = null
-  )) {
-    return(x)
-  }
-  stop_vector_mistyped(
-    x = x,
-    x_name = x_name,
-    type_desc = c("a", "character vector"),
-    type_test = is.character(x),
-    len = len,
-    nas = nas,
-    null = null,
-    min_len = min_len,
-    max_len = max_len,
-    error_call = error_call,
-    error_class = error_class
-  )
-}
-class(chr) <- c("specifyr_type_check", "function")
+test_chr <- new_builtin_type(
+  type_class = "character",
+  type_desc = c("a", "{.cls character} vector"),
+  fun_is = "test",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL
+)
 
-test_chr <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf
-) {
-  checkmate::test_character(
-    x,
-    any.missing = nas,
-    len = len,
-    min.len = min_len,
-    max.len = max_len,
-    null.ok = null
-  )
-}
-class(test_chr) <- c("specifyr_type_test", "function")
+lst_of_chr <- new_list_of_type(chr)
 
-lst_of_chr <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
+test_lst_of_chr <- new_list_of_type(test_chr)
 
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (lst_null && is.null(x)) {
-    return(x)
-  }
-  if (!checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = lst_null
-  )) {
-    stop_vector_mistyped(
-      x = x,
-      x_name = x_name,
-      type_desc = c("a", "list"),
-      type_test = is.list(x),
-      len = lst_len,
-      null = lst_null,
-      min_len = lst_min_len,
-      max_len = lst_max_len,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  .mapply(
-    FUN = chr,
-    dots = list(
-      x = x,
-      x_name = sprintf("%s[[%i]]", x_name, seq_along(x))
-    ),
-    MoreArgs = list(
-      len = len,
-      nas = nas,
-      null = null,
-      min_len = min_len,
-      max_len = max_len,
-      error_call = error_call,
-      error_class = error_class
-    )
-  )
-}
-class(lst_of_chr) <- c("specifyr_type_check", "function")
+# psx --------------------------------------------------------------------------
 
-test_lst_of_chr <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
+psx <- new_builtin_type(
+  type_class = "posixct",
+  type_desc = c("a", "{.cls POSIXct} vector"),
+  fun_is = "check",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL,
+  lower = NULL,
+  upper = NULL
+)
 
-  checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = lst_null
-  ) && all(vapply(
-    X = x,
-    FUN = test_chr,
-    FUN.VALUE = logical(1L),
-    len = len,
-    nas = nas,
-    null = null,
-    min_len = min_len,
-    max_len = max_len
-  ))
-}
-class(test_lst_of_chr) <- c("specifyr_type_test", "function")
+test_psx <- new_builtin_type(
+  type_class = "posixct",
+  type_desc = c("a", "{.cls POSIXct} vector"),
+  fun_is = "test",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL,
+  lower = NULL,
+  upper = NULL
+)
+
+lst_of_psx <- new_list_of_type(psx)
+
+test_lst_of_psx <- new_list_of_type(test_psx)
+
+# dte --------------------------------------------------------------------------
+
+dte <- new_builtin_type(
+  type_class = "date",
+  type_desc = c("a", "{.cls Date} vector"),
+  fun_is = "check",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL,
+  lower = NULL,
+  upper = NULL
+)
+
+test_dte <- new_builtin_type(
+  type_class = "date",
+  type_desc = c("a", "{.cls Date} vector"),
+  fun_is = "test",
+  len = NULL,
+  nas = TRUE,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL,
+  lower = NULL,
+  upper = NULL
+)
+
+lst_of_dte <- new_list_of_type(dte)
+
+test_lst_of_dte <- new_list_of_type(test_dte)
+
+# fac --------------------------------------------------------------------------
+
+# TODO: Factor
 
 # byt --------------------------------------------------------------------------
 
-byt <- function(
-    x,
-    len = NULL,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
+byt <- new_builtin_type(
+  type_class = "raw",
+  type_desc = c("a", "{.cls raw} vector"),
+  fun_is = "check",
+  len = NULL,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL
+)
 
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (checkmate::test_raw(
-    x,
-    len = len,
-    min.len = min_len,
-    max.len = max_len,
-    null.ok = null
-  )) {
-    return(x)
-  }
-  stop_vector_mistyped(
-    x = x,
-    x_name = x_name,
-    type_desc = c("a", "raw vector"),
-    type_test = is.raw(x),
-    len = len,
-    nas = nas,
-    null = null,
-    min_len = min_len,
-    max_len = max_len,
-    error_call = error_call,
-    error_class = error_class
-  )
-}
-class(byt) <- c("specifyr_type_check", "function")
+test_byt <- new_builtin_type(
+  type_class = "raw",
+  type_desc = c("a", "{.cls raw} vector"),
+  fun_is = "test",
+  len = NULL,
+  null = FALSE,
+  min_len = NULL,
+  max_len = NULL
+)
 
-test_byt <- function(
-    x,
-    len = NULL,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lower = -Inf,
-    upper = Inf
-) {
-  checkmate::test_raw(
-    x,
-    len = len,
-    min.len = min_len,
-    max.len = max_len,
-    null.ok = null
-  )
-}
-class(test_byt) <- c("specifyr_type_test", "function")
+lst_of_byt <- new_list_of_type(byt)
 
-lst_of_byt <- function(
-    x,
-    len = NULL,
-    nas = TRUE,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
-
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  if (null && is.null(x)) {
-    return(x)
-  }
-  if (!checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = lst_null
-  )) {
-    stop_vector_mistyped(
-      x = x,
-      x_name = x_name,
-      type_desc = c("a", "list"),
-      type_test = is.list(x),
-      len = lst_len,
-      null = lst_null,
-      min_len = lst_min_len,
-      max_len = lst_max_len,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
-  .mapply(
-    FUN = byt,
-    dots = list(
-      x = x,
-      x_name = sprintf("%s[[%i]]", x_name, seq_along(x))
-    ),
-    MoreArgs = list(
-      len = len,
-      nas = nas,
-      null = null,
-      min_len = min_len,
-      max_len = max_len,
-      error_call = error_call,
-      error_class = error_class
-    )
-  )
-}
-class(lst_of_byt) <- c("specifyr_type_check", "function")
-
-test_lst_of_byt <- function(
-    x,
-    len = NULL,
-    null = FALSE,
-    min_len = NULL,
-    max_len = NULL,
-    lst_len = NULL,
-    lst_min_len = NULL,
-    lst_max_len = NULL,
-    lst_null = FALSE,
-    x_name = rlang::caller_arg(x),
-    error_call = rlang::caller_env(),
-    error_class = "specifyr_error_mistyped"
-) {
-
-  checkmate::test_list(
-    x,
-    len = lst_len,
-    min.len = lst_min_len,
-    max.len = lst_max_len,
-    null.ok = lst_null
-  ) && all(vapply(
-    X = x,
-    FUN = test_byt,
-    FUN.VALUE = logical(1L),
-    len = len,
-    null = null,
-    min_len = min_len,
-    max_len = max_len
-  ))
-}
-class(test_lst_of_byt) <- c("specifyr_type_test", "function")
+test_lst_of_byt <- new_list_of_type(test_byt)
 
 # lst --------------------------------------------------------------------------
 
@@ -1402,14 +469,6 @@ vec <- function(
     error_class = "specifyr_error_mistyped"
 ) {
 
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
   if (checkmate::test_vector(
     x,
     any.missing = nas,
@@ -1436,18 +495,6 @@ vec <- function(
 }
 class(vec) <- c("specifyr_type_check", "function")
 
-# psx --------------------------------------------------------------------------
-
-# TODO: POSIXct
-
-# dte --------------------------------------------------------------------------
-
-# TODO: Date
-
-# fac --------------------------------------------------------------------------
-
-# TODO: Factor
-
 # intish -----------------------------------------------------------------------
 
 intish <- function(
@@ -1464,14 +511,6 @@ intish <- function(
     error_class = "specifyr_error_mistyped"
 ) {
 
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
   if (checkmate::test_integerish(
     x,
     any.missing = nas,
@@ -1542,14 +581,6 @@ lst_of_intish <- function(
     error_class = "specifyr_error_mistyped"
 ) {
 
-  if (rlang::is_missing(x)) {
-    stop_arg_missing(
-      x = x,
-      x_name = x_name,
-      error_call = error_call,
-      error_class = error_class
-    )
-  }
   if (lst_null && is.null(x)) {
     return(x)
   }
@@ -1573,12 +604,10 @@ lst_of_intish <- function(
       error_class = error_class
     )
   }
-  .mapply(
+  mapply(
     FUN = intish,
-    dots = list(
-      x = x,
-      x_name = sprintf("%s[[%i]]", x_name, seq_along(x))
-    ),
+    x = x,
+    x_name = sprintf("%s[[%i]]", x_name, seq_along(x)),
     MoreArgs = list(
       len = len,
       nas = nas,
@@ -2125,3 +1154,45 @@ is_type_check <- function(x) {
 is_type_test <- function(x) {
   inherits(x, "specifyr_type_test")
 }
+
+# interactive testing ----------------------------------------------------------
+
+if (FALSE) {
+
+  library(ivs)
+
+  ivv <- new_vector_fun(
+    type_test = is_iv(x),
+    type_desc = c("an", "interval vector"),
+    len = NULL,
+    nas = TRUE,
+    null = FALSE,
+    min_len = NULL,
+    max_len = NULL,
+    lower = NULL,
+    upper = NULL,
+
+   # TODO: Allow checks to be added in the ... arguments!!
+
+    # !!! You need to make a way for:
+    # 1. Checks to accept additional arguments
+    # 2. A check to be used as a named argument to `new_vector_property`!!!
+    #
+    # User provides this...
+    # `intersects = check_iv_intersects(x, intersects = intersects)`
+    #
+    # In the function at the check stage we do...
+    # if (!is_missing(intersects) && test_iv_intersects(x, intersects)) {
+    #   emit_iv_intersects_stop()
+    # }
+    #
+    # The argument looks like `intersects = rlang::missing_arg()`
+
+    # Users can provide unnamed checks, which are always run! Or a named check,
+    # which is only run when the argument is supplied!!!
+  )
+
+  my_iv <- ivs::iv(1:5, 7:11)
+  ivv(my_iv, len = 4L)
+}
+

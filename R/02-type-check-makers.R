@@ -2,7 +2,7 @@
 
 # IMPORTANT:
 # Define what is currently in `type-check-maker` at the top of this script, use
-# it to define the remaining functions. That is, use `new_vector_type`,
+# it to define the remaining functions. That is, use `new_vector_fun`,
 # `new_object_type`, and `new_list_of_type`, to define all of the functions here.
 #
 # While you're at it, move aliases (e.g. `bool`, `string`, `count`) to an alias
@@ -46,7 +46,7 @@
 #   - `new_vector_aliaser()` could be a function which generates an alias generator...
 #   - you'd potentially want an alias generator if you need to use different versions
 #     of a type alias (e.g. `a_int(len = 1L)`, `a_int(nas = FALSE)`, etc.)
-new_vector_type <- function(
+new_vector_fun <- function(
     # NOTE: Make sure it's clear in the documentation that `type_test` should
     #       return FALSE on `NULL` values, to prevent `NULL` values from having
     #       their length, bounds, etc. tested (possibly throwing an error). This
@@ -54,7 +54,7 @@ new_vector_type <- function(
     type_test,
     type_desc,
     ...,
-    fun_is = c("check", "test"),
+    fun_is = c("check", "test", "alias", "aliaser"), # TODO: Create `alias` option
     checks = list(),
     x_name = NULL,
     error_header = NULL,
@@ -89,7 +89,8 @@ new_vector_type <- function(
   if (fun_is == "test") {
     out <- rlang::new_function(
       args = rlang::pairlist2(x = , !!!properties),
-      body = test
+      body = test,
+      env = parent_env
     )
     class(out) <- c("specifyr_type_test", "function")
     return(out)
@@ -224,17 +225,17 @@ new_list_of_type <- function(
 
   if (is_type_test(type_fun)) {
     # `all(vapply(X = x, FUN = test_int, ..., len = len, nas = nas))`
-    element_type_test <- rlang::call2(
-      .fn = "vapply",
-      X = rlang::sym("x"),
-      FUN = type_fun_defused,
-      FUN.VALUE = rlang::expr(logical(1L)),
-      !!!rlang::set_names(
-        x = rlang::syms(type_property_nms),
-        nm = type_property_nms
-      )
+    element_type_test <- rlang::expr(
+      all(vapply(
+        X = x,
+        FUN = !!type_fun_defused,
+        FUN.VALUE = logical(1L),
+        !!!rlang::set_names(
+          x = rlang::syms(type_property_nms),
+          nm = type_property_nms
+        )
+      ))
     )
-    element_type_test <- rlang::expr(all(!!element_type_test))
 
     # `checkmate::test_list(...) && all(vapply(x, test_int, ...)) && check1(x) ...`
     body <- expr_and(list_type_test, element_type_test, !!!check_tests)
@@ -296,22 +297,18 @@ new_list_of_type <- function(
     "error_header",
     "error_bullets"
   )
-
-  # TODO: This HAS to be a pairlist, as a list doesn't work. Find out what's
-  #       the deal here. If this is a list, you get an error `object "lower" not found`
-  #       when you run `new_list_of_type(int)(list(1L))`.
-  more_args <- rlang::pairlist2(!!!rlang::set_names(
+  more_args <- rlang::set_names(
     x = rlang::syms(more_args),
     nm = more_args
-  ))
+  )
 
-  # `mapply(FUN = int, x, x_name, len = len, nas = nas, ...)`
-  stop_if_elements_mistyped <- rlang::call2(
-    .fn = "mapply",
-    FUN = type_fun_defused,
-    x = rlang::sym("x"),
-    x_name = rlang::expr(sprintf("%s[[%i]]", x_name, seq_along(x))),
-    MoreArgs = more_args
+  # `.mapply(FUN = int, dots = list(x = x, x_name = x_name), MoreArgs = list(...))`
+  stop_if_elements_mistyped <- rlang::expr(
+    .mapply(
+      FUN = !!type_fun_defused,
+      dots = list(x = x, sprintf("%s[[%i]]", x_name, seq_along(x))),
+      MoreArgs = list(!!!more_args)
+    )
   )
 
   #> # Return `x` if it's NULL and `lst_null == TRUE`
@@ -321,7 +318,7 @@ new_list_of_type <- function(
   #> if (!(checkmate::test_list(...)) { stop_mistyped(x, ...) }
   #>
   #> # Raise a mistyped error if elements of `x` don't pass check in `type_fun`
-  #> .mapply(FUN = type_fun, x = x, x_name = x_name, ...)
+  #> .mapply(FUN = type_fun, dots = list(x = x, x_name = x_name), ...)
   #>
   #> # Raise a check error if the corresponding check failed
   #> if (!check_test1(x)) { stop_check1(x, ...) }`
@@ -329,7 +326,6 @@ new_list_of_type <- function(
   #> # Return the checked list `x`
   #> return(x)
   body <- expr_squash(
-    # quote(browser()),
     return_if_null,
     stop_if_list_mistyped,
     stop_if_elements_mistyped,
@@ -360,6 +356,10 @@ new_list_of_type <- function(
   out
 }
 
+# TODO: Make this an external function, which matches `new_vector_fun`, but allows
+#       you to submit a builtin class name instead of a type check, and uses checkmate
+#       on the backend.
+#
 # Internal function factory, used for building the type check functions
 # provided by {specifyr}
 new_builtin_type <- function(
@@ -384,7 +384,8 @@ new_builtin_type <- function(
   if (fun_is == "test") {
     out <- rlang::new_function(
       args = rlang::pairlist2(x = , !!!properties),
-      body = test
+      body = test,
+      env = parent_env
     )
     class(out) <- c("specifyr_builtin_type_test", "specifyr_type_test", "function")
     return(out)
@@ -422,18 +423,43 @@ new_builtin_type <- function(
   out
 }
 
-# TODO: Implement
-new_builtin_list_of_type <- function(
-    type_class,
+# internal constructor ---------------------------------------------------------
+
+# TODO: Using this function for all of the internal {specifyr} functions (i.e.
+# `int`, `test_int`, `intish`, etc.)
+new_specifyr_builtin_fun <- function(
+  type_class,
+  type_desc,
+  ...,
+  stop_with = quote(specifyr::stop_mistyped_vector),
+  fun_is = c("check", "test", "alias", "aliaser"), # TODO: Create `alias` option
+  checks = list(),
+  x_name = NULL,
+  error_header = NULL,
+  error_bullets = NULL,
+  error_class = "specifyr_error_mistyped"
+  ) {
+
+}
+
+new_specifyr_vector_fun <- function(
+    type_test,
     type_desc,
     ...,
-    fun_is = c("check", "test"),
-    error_class = "specifyr_error_mistyped",
+    stop_with = quote(specifyr::stop_mistyped_vector),
+    fun_is = c("check", "test", "alias", "aliaser"), # TODO: Create `alias` option
+    checks = list(),
+    x_name = NULL,
     error_header = NULL,
-    error_bullets = NULL
+    error_bullets = NULL,
+    error_class = "specifyr_error_mistyped"
 ) {
-  stop("Not implemented")
+
 }
+
+# TODO:
+# - create custom `stop_mistyped_vector` functions for `intish`, `chr`, `fac`,
+#   and others that require a custom check
 
 # helpers ----------------------------------------------------------------------
 
@@ -443,6 +469,159 @@ is_type_check <- function(x) {
 
 is_type_test <- function(x) {
   inherits(x, "specifyr_type_test")
+}
+
+# repro of lower not found error -----------------------------------------------
+
+# SOLVED: Look through all of the examples until the end, where the simplest repo
+#         is made.
+if (FALSE) {
+
+  library(rlang)
+
+  # Paste a prefix and suffix onto `x`
+  fun <- function(x, prefix = "<", suffix = ">") {
+    paste0(prefix, x, suffix)
+  }
+
+  # Make a version of `fun()` which is vectorized over a list `x`, with
+  # different `prefix` and `suffix` defaults.
+  make_fun <- function(prefix, suffix, happy_path = TRUE) {
+
+    # Create symbols for prefix and suffix
+    more_args <- c("prefix", "suffix")
+    more_args <- set_names(syms(more_args), more_args)
+
+    if (happy_path) {
+      # This works
+      body <- expr(
+        mapply(
+          FUN = fun,
+          x = x,
+          MoreArgs = list(!!!more_args),
+          SIMPLIFY = TRUE
+        )
+      )
+    } else {
+      # This does not work, but the output looks identical
+      body <- expr(
+        mapply(
+          FUN = fun,
+          x = x,
+          MoreArgs = !!more_args,
+          SIMPLIFY = TRUE
+        )
+      )
+    }
+
+    # Create and return the new function
+    env <- rlang::caller_env()
+    new_function(
+      args = pairlist2(x = , prefix = prefix, suffix = suffix),
+      body = body,
+      env = env
+    )
+  }
+
+  # Create the function with specified prefix and suffix
+  fun_happy <- make_fun("[", "]", happy_path = TRUE)
+  fun_sad   <- make_fun("[", "]", happy_path = FALSE)
+
+  # They're not identical
+  identical(fun_happy, fun_sad)
+
+  # They look identical
+  print(fun_happy)
+  print(fun_sad)
+
+  # When you convert the call to a character, `MoreArgs` drops it's names
+  as.character(fn_body(fun_happy))
+  as.character(fn_body(fun_sad))
+
+  # They look identical
+  print(fun_happy)
+  print(fun_sad)
+
+  fun_happy(1:5)
+  fun_sad(1:5)
+
+  # Here's a super minimal example of what's happening
+
+  more_args <- set_names(syms(c("a", "b")), c("a", "b"))
+  f1 <- new_function(
+    args = pairlist2(a = , b = ),
+    body = rlang::expr(!!more_args)
+  )
+
+  # This returns the list(a = a, b = b), where `a` and `b` are still symbols.
+  # So, I've injected THIS list, which was evaluated when `a`, `b` were symbols...
+  #
+  # The problem, I think, is that I've actually injected a `list()` object and NOT
+  # a call to `list()` the function. These look the same, but are not.
+  f1(1, 2)
+
+  # The first is a list, the second is a call to list. When I inject the first,
+  # I am injecting an already created list of symbols. When I inject the second,
+  # I am injecting an unevaluated call to list.
+  class(more_args)
+  class(rlang::expr(list(!!!more_args)))
+
+  # The problem lies in the fact that, when I put a list of named symbols `a`, `b`
+  # in the body of a function, it looks identical to a call to `list(a = a, b = b)`.
+  new_function(args = pairlist2(x = ), body = more_args)
+  new_function(args = pairlist2(x = ), body = rlang::expr(list(!!!more_args)))
+
+  # Here, I think `a = a, b = b` are injected as arguments to `list()`? So they
+  # are evaluated in the correct context. The question is, if I wanted to make
+  # a `list(a = a, b = b)` OUTSIDE of the body expression, but have it evaluated
+  # correctly in the body, how would I do that?
+  f2 <- new_function(
+    args = pairlist2(a = , b = ),
+    body = rlang::expr(list(!!!more_args))
+  )
+  f2(1, 2)
+
+  # What do I change here the have the list injected?
+  more_args <- set_names(syms(c("a", "b")), c("a", "b"))
+
+  # Both of these work!
+  more_args1 <- rlang::call2(.fn = "list", a = sym("a"), b = sym("b"))
+  more_args2 <- rlang::call2(.fn = "list", !!!more_args)
+  identical(more_args1, more_args2)
+
+  f3 <- new_function(
+    args = pairlist2(a = , b = ),
+    body = more_args1
+  )
+  f3(1, 2)
+
+  # Base version of the riddle
+  f1 <- f2 <- function(x) {}
+  methods::functionBody(f1) <- quote(list(x))
+  methods::functionBody(f2) <- list(quote(x))
+  f1(10)
+  f2(10)
+
+  # Riddle
+  f1 <- rlang::new_function(args = pairlist2(x = ), body = expr(list(!!sym("x"))))
+  f2 <- rlang::new_function(args = pairlist2(x = ), body = list(sym("x")))
+
+  # Two functions, `f1` and `f2`
+  print(f1)
+  print(f2)
+
+  # The function body looks identical
+  identical(as.character(fn_body(f1)), as.character(fn_body(f2)))
+  as.character(fn_body(f1))
+
+  # Both defined in the global environment
+  identical(fn_env(f1), fn_env(f2))
+  fn_env(f1)
+
+  # Both evaluated in the global environment
+  identical(f1(10), f2(10))
+  f1(10)
+  f2(10)
 }
 
 # testing ----------------------------------------------------------------------

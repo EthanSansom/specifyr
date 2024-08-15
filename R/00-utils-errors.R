@@ -1,3 +1,8 @@
+# todos ------------------------------------------------------------------------
+
+# TODO:
+# - See `check_property_dots` for an important todo
+
 # stop mistyped ----------------------------------------------------------------
 
 #' @export
@@ -24,7 +29,7 @@ stop_vector_mistyped <- function(
     #       Think about what  the longest possible message would be.
     max_name_width = 40,
     name_replacement = "Argument"
-) {
+  ) {
 
   # TODO: It's not clear where, or if, we should raise an error for invalid
   #       arguments like `error_class`, `error_bullets`, etc. These won't
@@ -218,6 +223,20 @@ stop_not_integerish <- function(
   )
 }
 
+stop_not_character <- function() {
+
+}
+
+stop_not_factor <- function() {
+
+}
+
+stop_not_funish <- function() {
+
+}
+
+## mistyped helpers ------------------------------------------------------------
+
 stop_arg_missing <- function(
     x,
     x_name,
@@ -240,10 +259,7 @@ stop_wrong_names <- function(
     error_class = "specifyr_error_mistyped"
   ) {
 
-
-
 }
-
 
 vector_mistyped_bullets <- function(
     x,
@@ -388,6 +404,188 @@ check_is_alias <- function(
     obj_desc = c("a", "{.cls specifyr_type_alias}"),
     error_call = error_call,
     error_class = error_class
+  )
+}
+
+check_property_dots <- function(
+    ...,
+    .list_of_properties = FALSE,
+    .error_call = rlang::caller_env(),
+    .error_class = "specifyr_error_invalid_arg"
+) {
+
+  properties <- rlang::list2(...)
+  property_nms <- rlang::names2(properties)
+
+  # Check names, check for duplicates
+  if (any(property_nms == "")) {
+    cli::cli_abort(
+      c(
+        "Arguments to `...` must be named.",
+        x = '`...` arguments are unnamed {at_loc_friendly(property_nms == "")}.'
+      ),
+      call = .error_call,
+      class = c("specifyr_error", .error_class)
+    )
+  } else if (any(property_nms %notin% builtin_properties(.list_of_properties))) {
+    unrecognized <- setdiff(property_nms, builtin_properties(.list_of_properties))
+    cli::cli_abort(
+      c(
+        "Arguments to `...` must be valid object properties to test or check.",
+        x = "Supplied unrecognized properties: {.arg {unrecognized}}.",
+        i = "Recognized properties are: {.arg {builtin_properties(.list_of_properties)}}."
+      ),
+      call = .error_call,
+      class = c("specifyr_error", .error_class)
+    )
+  } else if (any(duplicated(property_nms))) {
+    cli::cli_abort(
+      c(
+        "Arguments to `...` must have unique names.",
+        x = "Duplicate argument names suppled to `...` {at_loc_friendly(duplicated(property_nms))}."
+      ),
+      call = .error_call,
+      class = c("specifyr_error", .error_class)
+    )
+  }
+
+  # Check that each property is valid, if it was supplied
+  "null" %notin% property_nms || bool(properties$null, x_name = "null", error_call = .error_call, error_class = .error_class)
+  "nas" %notin% property_nms || bool(properties$nas, x_name = "nas", error_call = .error_call, error_class = .error_class)
+  "finite" %notin% property_nms || bool(properties$finite, x_name = "finite", error_call = .error_call, error_class = .error_class)
+  len <- properties$len %!|% count(properties$len, x_name = "len", error_call = .error_call, error_class = .error_class)
+  min_len <- properties$min_len %!|% count(properties$min_len, x_name = "min_len", error_call = .error_call, error_class = .error_class)
+  max_len <- properties$max_len %!|% count(properties$max_len, x_name = "max_len", error_call = .error_call, error_class = .error_class)
+
+  # Check the relationship between entangled arguments len, min_len, max_len
+  stop_incompatible_length_properties(
+    len = len,
+    min_len = min_len,
+    max_len = max_len,
+    error_call = .error_call,
+    error_class = .error_class
+  )
+
+  # Check the relationship between entangled arguments lower, upper. If
+  # they exist, we'll need to take their quoted value, since they may
+  # be a call to create a complex bound object (i.e. a Date).
+  if ("lower" %in% property_nms && "upper" %in% property_nms) {
+    stop_incompatible_bounds_properties(
+      lower = properties$lower,
+      upper = properties$upper
+    )
+  }
+
+  # TODO: ACTUALLY! You need to just quote EVERY argument, so that the default
+  # argument could be a call or some other argument. Might as well ALL be quoted.
+  # So, after checking all of the VALUES of the evaluated built-in (with {specifyr})
+  # properties, return them as quoted expressions!
+  properties$lower <- rlang::enquos(...)$lower
+  properties$upper <- rlang::enquos(...)$upper
+
+  # Note that accessing with `$` has been creating NULL objects if they didn't
+  # actually exist in `properties` (i.e. weren't provided to `...`). Now, we
+  # use the names to return only the provided properties.
+  properties[property_nms]
+}
+
+# Stop if:
+# - both `len` and `min_len` or `max_len` are supplied
+# - `min_len` is greater than `max_len`
+stop_incompatible_length_properties <- function(
+    len,
+    min_len,
+    max_len,
+    len_name = "len",
+    min_len_name = "min_len",
+    max_len_name = "max_len",
+    error_call = rlang::caller_env(),
+    error_class = "specifyr_error_invalid_arg"
+) {
+
+  if (!is.null(len) && (!is.null(min_len) || !is.null(max_len))) {
+    non_null <- oxford(
+      # `x` is the names of non-NULL arguments len, min_len, max_len
+      x = paste0("{.arg ", c(len_name, min_len %!|% min_len_name, max_len %!|% max_len_name), "}"),
+      last = "and"
+    )
+    cli::cli_abort(
+      c(
+        "Either {.arg {len_name}} must be NULL or both of {.arg {min_len_name}} and {.arg {max_len_name}} must be NULL.",
+        x = paste("Arguments", non_null, "are not NULL.")
+      ),
+      call = error_call,
+      class = c("specifyr_error", error_class)
+    )
+  } else if (isTRUE(min_len > max_len)) {
+    cli::cli_abort(
+      c(
+        "{.arg {min_len_name}} must be less than or equal to {.arg {max_len}}.",
+        x = "{.arg {min_len_name}} is {.val {min_len}}.",
+        x = "{.arg {max_len_name}} is {.val {max_len}}."
+      ),
+      call = error_call,
+      class = c("specifyr_error", error_class)
+    )
+  }
+}
+
+stop_incompatible_bounds_properties <- function(
+    lower,
+    upper,
+    lower_name = "lower",
+    upper_name = "upper",
+    error_call = rlang::caller_env(),
+    error_class = "specifyr_error_invalid_arg"
+) {
+
+  valid_bounds <- rlang::try_fetch(
+    lower <= upper,
+    error = function(cnd) {
+      cli::cli_abort(
+        c(
+          "{.arg {lower_name}} must be less than or equal to {.arg {upper_name}}.",
+          x = "Can't evaluate `{lower_name} <= {upper_name}`.",
+          i = "{.arg {lower_name}} is {.obj_type_friendly {lower}}.",
+          i = "{.arg {upper_name}} is {.obj_type_friendly {upper}}."
+        ),
+        call = error_call,
+        class = c("specifyr_error", error_class),
+        parent = cnd
+      )
+    }
+  )
+  if (!valid_bounds) {
+    cli::cli_abort(
+      c(
+        "{.arg {lower_name}} must be less than or equal to {.arg {upper_name}}.",
+        x = "{.arg {lower_name}} is {.val {lower}}.",
+        x = "{.arg {upper_name}} is {.val {upper}}."
+      ),
+      call = error_call,
+      class = c("specifyr_error", error_class)
+    )
+  }
+}
+
+builtin_properties <- function(list_of_properties) {
+  c(
+    "len",
+    "min_len",
+    "max_len",
+    "nas",
+    "null",
+    "lower",
+    "upper",
+    "finite",
+    if (isTRUE(list_of_properties)) {
+      c(
+        "lst_len",
+        "lst_min_len",
+        "lst_max_len",
+        "lst_null"
+      )
+    }
   )
 }
 
@@ -604,7 +802,7 @@ a_length_n_friendly <- function(len) {
   } else if (len == 1) {
     "a scalar"
   } else if (len > 0) {
-    paste0("a length", format_len(len))
+    paste0("a length-", format_len(len))
   } else {
     "an empty"
   }

@@ -190,3 +190,68 @@ is_recycled_alias <- function(
 is_alias <- function(x) {
   inherits(x, "specifyr_alias")
 }
+
+# Interactive Testing ----------------------------------------------------------
+
+if (FALSE) {
+
+  # Assign intermediate results of the check tests. I think, because of lazy eval,
+  # this won't really incur any kind of penalty.
+  f_assign <- function(x) {
+
+    if (
+      (type_res <- (is.numeric(x))) &&
+      (length_res <- (length(x) == 1000L)) &&
+      # Whoops, I forgot that if `x` fails either of the previous checks, we'd
+      # actually never reach this pre-assignment making the `bullets <-` step invalid
+      (nas_res <- (!anyNA(x)))
+    ) {
+      return(x)
+    }
+
+    bullets <- c(
+      if (!isTRUE(type_res)) "`x` is wrong type",
+      if (!isTRUE(length_res)) "`x` is bad length",
+      if (!isTRUE(nas_res)) "`x` is bad NAs"
+    )
+    cli::cli_abort(bullets)
+
+  }
+
+  # Don't assign intermediate values
+  f_no_assign <- function(x) {
+
+    if (
+      is.numeric(x) &&
+      (length(x) == 1000L) &&
+      !anyNA(x)
+    ) {
+      return(x)
+    }
+
+    bullets <- c(
+      if (!isTRUE(is.numeric(x))) "`x` is wrong type",
+      if (!isTRUE(length(x) == 1000L)) "`x` is bad length",
+      if (!isTRUE(!anyNA(x))) "`x` is bad NAs"
+    )
+    cli::cli_abort(bullets)
+
+  }
+
+  # Assigning is slightly slower, but only by ~100 nanoseconds. I think if we
+  # expect every assignment to only be a length-1 logical anyways, then we should
+  # be fine
+  x <- 1:1000
+  bench::mark(
+    f_assign(x),
+    f_no_assign(x)
+  )
+
+  x <- 1:999
+  bench::mark(
+    try(f_assign(x)),
+    try(f_no_assign(x)),
+    check = FALSE
+  )
+}
+

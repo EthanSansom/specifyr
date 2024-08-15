@@ -72,7 +72,7 @@ make_base_fixed_properties_test <- function(
   if ("null" %in% property_nms) {
     expr_or(rlang::expr(is.null(!!x_expr)), expr_and(type_test, !!!tests))
   } else {
-    expr_and(type_test, !!!tests)
+    expr_and(rlang::expr(!is.null(!!x_expr)), type_test, !!!tests)
   }
 }
 
@@ -88,32 +88,20 @@ make_base_variable_properties_test <- function(
     min_len = rlang::expr(is.null(min_len) || length(!!x_expr) >= min_len),
     max_len = rlang::expr(is.null(max_len) || length(!!x_expr) <= max_len),
     nas = rlang::expr(nas || !anyNA(!!x_expr)),
-    lower = rlang::expr(all((!!x_expr)[!is.na(!!x_expr)] >= lower)),
-    upper = rlang::expr(all((!!x_expr)[!is.na(!!x_expr)] <= upper)),
+    lower = rlang::expr(is.null(lower) || all((!!x_expr)[!is.na(!!x_expr)] >= lower)),
+    upper = rlang::expr(is.null(upper) || all((!!x_expr)[!is.na(!!x_expr)] <= upper)),
     finite = rlang::expr(!finite || is.finite(!!x_expr))
   )
 
   # The order of the tests is important, `intersect()` maintains that order
   tests <- property_tests[intersect(names(property_tests), property_nms)]
 
-  # If both `lower` and `upper` are supplied, testing both bounds within the
-  # same `all()` is faster
-  if ("lower" %in% property_nms && "upper" %in% property_nms) {
-    tests$lower <- tests$upper <- NULL
-    tests$bounds <- rlang::expr(
-      all(
-        lower <= (!!x_expr)[!is.na(!!x_expr)] &
-          (!!x_expr)[!is.na(!!x_expr)] <= upper
-      )
-    )
-  }
-
   # Expression like `is.numeric(x) && (is.null(len) || length(x) == len) && ...`
   # If `null` is allowed, like (null && is.null(x)) || (is.numeric(x) && ...)
   if ("null" %in% property_nms) {
     expr_or(rlang::expr(null && is.null(!!x_expr)), expr_and(type_test, !!!tests))
   } else {
-    expr_and(type_test, !!!tests)
+    expr_and(rlang::expr(!is.null(!!x_expr)), type_test, !!!tests)
   }
 }
 
@@ -461,6 +449,8 @@ make_class_to_type_test <- function(type_class) {
     raw = quote(is.raw(x)),
     factor = quote(is.factor(x)),
     list = quote(is.list(x)),
+    posixct = quote(inherits(x, "POSIXct")),
+    date = quote(inherits(x, "Date")),
     environment = quote(is.environment(x)),
     data.frame = quote(is.data.frame(x)),
     `function` = quote(is.function(x)),
@@ -508,6 +498,9 @@ expr_and <- function(..., .double = TRUE, .compact = TRUE) {
 # https://stackoverflow.com/questions/26638746/how-can-i-do-partial-substitution-in-r?rq=3
 # - taking example from MrFlick
 # - you could also use `substitute(substitute(` from Josh O'Brien
+#
+# Read on the R Language Definition for more details:
+# - https://cran.r-project.org/doc/manuals/r-release/R-lang.html#Substitutions
 replace_symbols <- function(expr, ...) {
   replacements <- rlang::list2(...)
   if (!rlang::is_named2(replacements)) {
@@ -516,4 +509,121 @@ replace_symbols <- function(expr, ...) {
     cli::cli_abort("`...` must be symbols", .internal = TRUE)
   }
   do.call("substitute", list(expr, replacements))
+}
+
+replace_symbols2 <- function(expr, ...) {
+  replacements <- rlang::list2(...)
+  if (!rlang::is_named2(replacements)) {
+    cli::cli_abort("`...` must be named", .internal = TRUE)
+  }
+  # See the R Language Definition for more details on why this works:
+  # - https://cran.r-project.org/doc/manuals/r-release/R-lang.html#Substitutions
+  #
+  # TLDR:
+  # If I provide the argument `expr = quote(x > 10)` then `substitute(expr)`
+  # will give me back `quote(x > 10)`, because substitute is looking for the expression
+  # component of the promise `expr` (recall that function arguments are promises).
+  # If I wanted to get back `x > 10` I'd have to actually provide `expr = x > 10`,
+  # which I can't do if `expr` was defined earlier.
+  #
+  # So! Instead I substitute `expr` INTO my inner substitute call. That way, the
+  # expression `quote(x > 10)` is *evaluated* by the outer `substitute()` and put
+  # into the inner `substitute()` in place of `inner_expr`. This way, my call
+  # looks like `eval(substitute(x > 10, replacements))`, which is exactly what I
+  # want.
+  eval(substitute(substitute(inner_expr, replacements), list(inner_expr = expr)))
+}
+
+# AH! Here in lies the problem {dplyr} is solving with `node_walk_replace()`.
+# `substitute()` doesn't know about functions, so does weird shit like this.
+replace_symbols(quote(function(x) x > 10), x = quote(y))
+replace_symbols2(quote(function(x) x > 10), x = quote(y))
+
+# Solution to the problem above ------------------------------------------------
+
+replace_symbol <- function(expr, old, new) {
+  stopifnot(
+    rlang::is_symbol(old),
+    rlang::is_expression(new)
+  )
+  switch_expr(
+    expr,
+
+    # Base Cases:
+    constant = expr,
+    symbol = if (identical(expr, old)) new else expr,
+
+    # TODO: If we wanted `replace_symbols`, we'd just need to change the symbol
+    # path to find WHICH symbol `expr` was identical to, then replace with the
+    # corresponding `new`.
+
+    # Recursive Cases:
+    pairlist = as.pairlist(lapply(expr, replace_symbol, old = old, new = new)),
+    call = {
+      if (!rlang::is_call(expr, "function")) {
+        # Replace any symbols within the call arguments
+        expr[-1] <- replace_symbol(as.pairlist(as.list(expr[-1])), old, new)
+        expr
+      } else {
+        # A call to `function` has 3 components:
+        # - [[1]] the symbol of the function itself (i.e. `function`)
+        # - [[2]] a pairlist of the formals, `function(< these >)` (NULL if no formals!)
+        # - [[3]] the function body as an expression, `function() { <this> }`
+        #
+        # We don't want to replace anything in the body, but we do want to
+        # replace symbols in the formals (e.g. `\(arg = x) { arg }`, we want
+        # to replace the default of `x` in `arg = x` if `old = quote(x)`).
+        fmls <- expr[[2]]
+        if (!is.null(fmls)) {
+          expr[[2]] <- replace_symbol(expr[[2]], old, new)
+        }
+        expr
+      }
+    }
+  )
+}
+
+# Copied from Advanced R: https://adv-r.hadley.nz/expressions.html#ast-funs
+expr_type <- function(x) {
+  if (rlang::is_syntactic_literal(x)) {
+    "constant"
+  } else if (is.symbol(x)) {
+    "symbol"
+  } else if (is.call(x)) {
+    "call"
+  } else if (is.pairlist(x)) {
+    "pairlist"
+  } else {
+    typeof(x)
+  }
+}
+
+# Copied from Advanced R: https://adv-r.hadley.nz/expressions.html#ast-funs
+switch_expr <- function(x, ...) {
+  switch(
+    expr_type(x),
+    ...,
+    stop("Don't know how to handle type ", typeof(x), call. = FALSE)
+  )
+}
+
+# Interactive Testing
+if (FALSE) {
+  # Normal usage works as expected
+  replace_symbol(quote(x + 10), quote(x), quote(y))
+  replace_symbol(quote(my_list$x), quote(x), quote(y))
+  replace_symbol(quote(my_list[["x"]]), quote(x), quote(y))
+  replace_symbol(quote(x + 10 + z), quote(z), quote(x[[1]]))
+  replace_symbol(quote(sum(x, x, x) + x), quote(x), quote(y))
+
+  # Function formal defaults are replaced, functions arguments are not
+  expr <- quote(function(x = x) x + 10)
+  replace_symbol(expr, quote(x), quote((y * 100)))
+
+  # Case with no function formals
+  replace_symbol(quote(x + function() 10), quote(x), quote(y))
+
+  # Call name is not replaced, but other symbols are
+  expr <- quote(f(10) - f)
+  replace_symbol(expr, quote(f), quote(x))
 }
