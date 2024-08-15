@@ -29,7 +29,7 @@ stop_vector_mistyped <- function(
     #       Think about what  the longest possible message would be.
     max_name_width = 40,
     name_replacement = "Argument"
-  ) {
+) {
 
   # TODO: It's not clear where, or if, we should raise an error for invalid
   #       arguments like `error_class`, `error_bullets`, etc. These won't
@@ -57,15 +57,15 @@ stop_vector_mistyped <- function(
   # error message header if no `error_header` is supplied.
   if (is.null(x_must)) {
     x_must <- paste("be", a_vector_friendly(
-        type_desc = type_desc,
-        len = len,
-        nas = nas,
-        null = null,
-        min_len = min_len,
-        max_len = max_len,
-        lower = lower,
-        upper = upper,
-        finite = finite
+      type_desc = type_desc,
+      len = len,
+      nas = nas,
+      null = null,
+      min_len = min_len,
+      max_len = max_len,
+      lower = lower,
+      upper = upper,
+      finite = finite
     ))
   }
 
@@ -117,7 +117,7 @@ stop_not_type <- function(
     error_class = "specifyr_error_mistyped",
     max_name_width = 40,
     name_replacement = "Argument"
-  ) {
+) {
 
   if (is.null(x_must)) {
     null_or <- if (isTRUE(null)) "`NULL` or " else ""
@@ -163,7 +163,7 @@ stop_not_integerish <- function(
     finite = NULL,
     error_call = rlang::caller_env(),
     error_class = "specifyr_error_mistyped"
-  ) {
+) {
 
   x_must <- x_must %||% paste("be", a_vector_friendly(
     type_desc = "vector coercible to an {.cls integer} without loss of precision",
@@ -242,7 +242,7 @@ stop_arg_missing <- function(
     x_name,
     error_call = rlang::caller_env(),
     error_class = "specifyr_error_mistyped"
-  ) {
+) {
   cli::cli_abort(
     "{.arg {x_name}} is absent but must be supplied.",
     call = error_call,
@@ -257,7 +257,7 @@ stop_wrong_names <- function(
     strict = FALSE,
     error_call = rlang::caller_env(),
     error_class = "specifyr_error_mistyped"
-  ) {
+) {
 
 }
 
@@ -272,7 +272,7 @@ vector_mistyped_bullets <- function(
     finite = NULL,
     name_too_long = FALSE,
     name_replacement = "Argument"
-  ) {
+) {
 
   object <- if (name_too_long) upper1(name_replacement) else "{.arg {x_name}}"
 
@@ -342,7 +342,7 @@ check_is_check <- function(
     x_name = rlang::caller_arg(x),
     error_call = rlang::caller_env(),
     error_class = "specifyr_error_input"
-  ) {
+) {
 
   if (is_check(x)) {
     return(x)
@@ -863,3 +863,5 @@ oxford <- function(x, sep = ", ", last = "or", n = NULL) {
   if (x_len == 2) sep <- " "
   paste(paste(x[-x_len], collapse = sep), last, x[[x_len]], sep = sep)
 }
+
+

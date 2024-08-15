@@ -2,9 +2,9 @@
 
 `%!|%` <- function(lhs, rhs) if (is.null(lhs)) lhs else rhs
 
-`%|?%` <- function(lhs, rhs) if (rlang::is_missing(lhs)) rhs else lhs
+`%|0%` <- function(lhs, rhs) if (is_empty(lhs)) rhs else lhs
 
-`%!?%` <- function(lhs, rhs) if (rlang::is_missing(lhs)) lhs else rhs
+`%!0%` <- function(lhs, rhs) if (is_empty(lhs)) lhs else rhs
 
 `%notin%` <- Negate(`%in%`)
 
@@ -16,25 +16,19 @@ if_false <- function(x, pass, fail) if (isFALSE(x)) pass else fail
 
 if_null <- function(x, pass, fail) if (is.null(x)) pass else fail
 
-try_is_true <- function(expr) {
-  isTRUE(rlang::try_fetch(expr, error = function(cnd) NULL))
+# Same as `identical()`, but handles missing arguments explicitly.
+# `identical(rlang::missing_arg(), rlang::missing_arg())` is `TRUE`, but
+# `x <- y <- rlang::missing_arg(); identical(x, y)` throws an error.
+identical2 <- function(x, y) {
+  x_missing <- rlang::is_missing(x)
+  y_missing <- rlang::is_missing(y)
+  (x_missing && y_missing) || (!(x_missing || y_missing) && identical(x, y))
 }
 
-try_null <- function(expr, null_if = ~ FALSE) {
-  null_if <- rlang::as_function(null_if)
-  result <- rlang::try_fetch(expr, error = function(cnd) NULL)
-  if (is.null(result) || isTRUE(null_if(result))) {
-    NULL
-  } else {
-    result
+all_identical <- function(elements) {
+  if (length(elements) <= 1) {
+    return(TRUE)
   }
-}
-
-blueprint <- function(x) {
-  attr(x, "blueprint")
-}
-
-`blueprint<-` <- function(x, value) {
-  attr(x, "blueprint") <- value
-  x
+  first <- elements[[1]]
+  all(purrr::map_lgl(elements[-1], identical2, first))
 }
